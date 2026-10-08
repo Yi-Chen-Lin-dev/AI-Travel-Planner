@@ -22,6 +22,9 @@ Runtime installation and application startup instructions will be added when the
 
 Read [the collaboration guide](CONTRIBUTING.md) before your first change.
 
+## Project board
+Track work on the [private project board](https://github.com/users/Yi-Chen-Lin-dev/projects/4): Todo → In Progress → Review → Done. Six initial planning and setup issues are included; owners and dates remain for the team to agree.
+
 ## Workflow
 Issue → feature branch → implementation and tests → commit → push → pull request → teammate review → merge.
 
