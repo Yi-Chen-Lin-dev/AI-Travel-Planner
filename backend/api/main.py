@@ -1,7 +1,13 @@
 from fastapi import FastAPI
+
 from .database import get_connection
+from .trips import router as trips_router
+
 
 app = FastAPI(title="AI Travel Planner API")
+
+# Register trip-related API routes
+app.include_router(trips_router)
 
 
 @app.get("/")
