@@ -48,3 +48,34 @@ def create_trip(data: TripCreate):
         "title": trip[2],
         "status": trip[3]
     }
+
+@router.get("/")
+def get_trips(user_id: UUID):
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            # Retrieve trips belonging to the specified user
+            cur.execute(
+                """
+                SELECT trip_id, user_id, title, destination,
+                       start_date, end_date, status
+                FROM public.trips
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                """,
+                (user_id,)
+            )
+
+            trips = cur.fetchall()
+
+    return [
+        {
+            "trip_id": str(trip[0]),
+            "user_id": str(trip[1]),
+            "title": trip[2],
+            "destination": trip[3],
+            "start_date": trip[4].isoformat() if trip[4] else None,
+            "end_date": trip[5].isoformat() if trip[5] else None,
+            "status": trip[6]
+        }
+        for trip in trips
+    ]
