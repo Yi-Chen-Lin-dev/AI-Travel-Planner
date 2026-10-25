@@ -10,11 +10,7 @@ The AI Travel Planner backend uses PostgreSQL to store users, trips, preferences
 
 
 
-The database initialization script is located at:
-
-
-
-`backend/table.sql`
+The database initialization script is located at `backend/table.sql`.
 
 
 
@@ -166,11 +162,7 @@ python -m uvicorn backend.api.main:app --reload
 
 
 
-Open the API documentation:
-
-
-
-`http://127.0.0.1:8000/docs`
+Open the API documentation at `http://127.0.0.1:8000/docs`.
 
 
 
@@ -209,4 +201,6 @@ Results:
 
 
 The original development database was not modified during this initialization test.
+
+
 
