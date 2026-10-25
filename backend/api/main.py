@@ -1,4 +1,6 @@
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from .database import get_connection
 from .trips import router as trips_router
@@ -8,7 +10,19 @@ from .pois import router as pois_router
 
 app = FastAPI(title="AI Travel Planner API")
 
-# Register trip-related API routes
+# Allow local frontend development origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
+)
+
+# Register API routes
 app.include_router(trips_router)
 app.include_router(preferences_router)
 app.include_router(pois_router)
@@ -31,4 +45,3 @@ def check_database():
         "database": result[0],
         "user": result[1]
     }
-
