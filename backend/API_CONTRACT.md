@@ -8,6 +8,8 @@
 
 > This document describes current backend behavior, not an approved final team contract. Examples are illustrative. IDs must be obtained from actual API responses. Authentication, CORS, and frontend integration are not yet confirmed as complete.
 
+<img width="990" height="647" alt="image" src="https://github.com/user-attachments/assets/8f4ade92-f392-4996-8d94-08406eecc663" />
+
 ## 1. Create a trip
 
 **POST** `/trips/`  
