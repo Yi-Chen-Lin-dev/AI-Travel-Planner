@@ -12,6 +12,9 @@
 > This document describes the currently implemented V2 backend API. It is not yet an approved final team contract. Example IDs and responses are illustrative. Actual identifiers must be obtained from the database or API responses.
 >
 > Authentication, authorization, production CORS configuration, and frontend integration are not yet confirmed as complete.
+>
+> <img width="809" height="653" alt="image" src="https://github.com/user-attachments/assets/547c53ed-2992-4f1a-9a26-42d3f13ae443" />
+
 
 ---
 
