@@ -14,26 +14,35 @@ The original V1 database schema is preserved in the `feature/fastapi-backend` br
 
 ## 2. Requirements
 
-- PostgreSQL 17
+- PostgreSQL 17 or 18
 - pgAdmin 4 or another PostgreSQL SQL client
 - A PostgreSQL user with permission to create databases and tables
+- The V2 database initialization script: `backend/database/planner.sql`
+
+The V2 schema has been imported into a local PostgreSQL 17 environment.
+William's development environment uses PostgreSQL 18.
 
 ## 3. Create the Database
 
 1. Open pgAdmin 4.
 2. Connect to your PostgreSQL server.
-3. Right-click **Databases** and select **Create → Database**.
-4. Enter the database name: `ai_travel_planner`.
+3. Right-click **Databases** and select **Create > Database**.
+4. Enter the database name: `planner`.
 5. Save the new database.
+
+The V1 database (`ai_travel_planner`) should be kept separately for rollback and compatibility testing.
 
 ## 4. Initialize the Tables
 
-1. Select the new `ai_travel_planner` database.
+1. Select the new `planner` database.
 2. Open **Query Tool**.
-3. Open `backend/table.sql`.
+3. Open `backend/database/planner.sql`.
 4. Execute the SQL script.
 5. Confirm that the script finishes without errors.
 
+**Important:** Run the initialization script against a new, empty database. Do not execute it against the existing V1 database.
+
+The SQL script creates the database structure but does not automatically populate countries, regions, or POIs with production data.
 **Important:** The initialization script is intended for a new, empty database. Do not rerun it against an existing database without reviewing the current schema.
 
 ## 5. Verify the Database
