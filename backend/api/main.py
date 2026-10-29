@@ -6,6 +6,8 @@ from .database import get_connection
 from .trips import router as trips_router
 from .preferences import router as preferences_router
 from .pois import router as pois_router
+from .regions import router as regions_router
+from .countries import router as countries_router
 
 
 app = FastAPI(title="AI Travel Planner API")
@@ -26,6 +28,8 @@ app.add_middleware(
 app.include_router(trips_router)
 app.include_router(preferences_router)
 app.include_router(pois_router)
+app.include_router(regions_router)
+app.include_router(countries_router)
 
 
 @app.get("/")
