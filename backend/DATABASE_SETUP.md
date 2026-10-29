@@ -65,25 +65,17 @@ SELECT
     ) AS foreign_key_count;
 ```
 
-Expected result:
+## 6.Expected result for the V2 database:
 
 | table_count | foreign_key_count |
 |---|---|
-| 11 | 17 |
+| 23 | 32 |
 
-## 6. Backend Connection
+The expected counts are based on the V2 schema imported into
+the local `planner` database.
 
-The backend reads its database configuration from environment variables.
-
-| Variable | Purpose | Default |
-|---|---|---|
-| `DB_HOST` | PostgreSQL host | `localhost` |
-| `DB_PORT` | PostgreSQL port | `5432` |
-| `DB_NAME` | Database name | `ai_travel_planner` |
-| `DB_USER` | PostgreSQL username | `postgres` |
-| `DB_PASSWORD` | PostgreSQL password | Required |
-
-Do not commit passwords, `.env` files, or other secrets to GitHub.
+This verification checks the database structure only.
+It does not confirm that all API endpoints work correctly.
 
 ## 7. Start the Backend
 
