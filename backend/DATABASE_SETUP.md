@@ -2,11 +2,15 @@
 
 ## 1. Overview
 
-The AI Travel Planner backend uses PostgreSQL to store users, trips, preferences, points of interest (POIs), and itineraries.
+The AI Travel Planner V2 backend uses PostgreSQL to store users, trips, preferences, points of interest (POIs), regions, recommendations, and itineraries.
 
-The database initialization script is located at `backend/table.sql`.
+This version integrates the updated database schema provided by William.
 
-The script creates 11 tables with 17 foreign key constraints.
+The database initialization script is located at `backend/database/planner.sql`.
+
+The V2 schema contains 23 tables with 32 foreign key constraints.
+
+The original V1 database schema is preserved in the `feature/fastapi-backend` branch.
 
 ## 2. Requirements
 
