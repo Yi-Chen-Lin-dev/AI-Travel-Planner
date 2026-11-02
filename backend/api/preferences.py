@@ -89,3 +89,39 @@ def save_preferences(data: PreferenceCreate):
         "pace": preference[3],
         "interests": preference[4]
     }
+
+@router.get("/{trip_id}", status_code=200)
+def get_preferences(trip_id: UUID):
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            # Retrieve preferences for the specified trip
+            cur.execute(
+                """
+                SELECT
+                    trip_id,
+                    budget_level,
+                    transport_mode,
+                    pace,
+                    interests
+                FROM public.trip_preferences
+                WHERE trip_id = %s
+                """,
+                (trip_id,)
+            )
+
+            preference = cur.fetchone()
+
+    # Return 404 if no preferences are found
+    if preference is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Preferences not found"
+        )
+
+    return {
+        "trip_id": str(preference[0]),
+        "budget": preference[1],
+        "transportation": preference[2],
+        "pace": preference[3],
+        "interests": preference[4]
+    }
