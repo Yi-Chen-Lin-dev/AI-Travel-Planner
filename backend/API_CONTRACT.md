@@ -4,8 +4,8 @@
 **Backend:** FastAPI  
 **Database:** PostgreSQL — `planner` (V2 schema)  
 **Database schema:** `backend/database/planner.sql`  
-**Last updated:** 2026-10-29  
-**Scope:** Six implemented endpoints, based on the reviewed backend implementation and previous API tests.  
+**Last updated:** 2026-11-02
+**Scope:** Seven implemented endpoints, based on the reviewed backend implementation and API tests.
 **Local API base URL:** `http://127.0.0.1:8000`  
 **Swagger documentation:** `http://127.0.0.1:8000/docs`
 
@@ -25,11 +25,12 @@
 | POST | `/trips/` | Create a draft trip | Implemented and tested |
 | GET | `/trips/` | List trips belonging to a user ID | Implemented and tested |
 | POST | `/preferences/` | Create or update trip preferences | Implemented and tested |
+| GET | `/preferences/{trip_id}` | Retrieve saved trip preferences | Implemented and tested |
 | GET | `/pois/` | List public points of interest | Implemented and tested |
 | GET | `/countries/` | Search and list countries | Implemented and tested |
 | GET | `/regions/` | Search and list enabled regions | Implemented and tested |
 
-**Total implemented business API endpoints: 6**
+**Total implemented business API endpoints: 7**
 
 Additional development-only endpoints are described in Section 8.
 
@@ -219,7 +220,97 @@ If `interests` is omitted, the API uses an empty array.
 The API does not yet verify whether the authenticated user owns the trip.
 
 ---
+## 4A. Retrieve Trip Preferences
 
+**Method:** GET  
+**Endpoint:** `/preferences/{trip_id}`  
+**Success status:** `200 OK`
+
+### Path Parameters
+
+| Parameter | Type | Required | Validation |
+|---|---|---|---|
+| `trip_id` | UUID string | Yes | Must be a valid UUID |
+
+### Example Request
+
+`GET /preferences/78e98bfc-25c8-4e35-9965-c51db195f2ef`
+
+### Example Response
+
+```json
+{
+  "trip_id": "78e98bfc-25c8-4e35-9965-c51db195f2ef",
+  "budget": "high",
+  "transportation": "driving",
+  "pace": "fast",
+  "interests": [
+    "shopping",
+    "entertainment"
+  ]
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `trip_id` | UUID string | Unique identifier of the trip |
+| `budget` | String or null | Saved budget level |
+| `transportation` | String or null | Saved transportation preference |
+| `pace` | String or null | Saved travel pace |
+| `interests` | Array of strings or null | Saved travel interests |
+
+### Behavior
+
+- Retrieves saved preferences from `public.trip_preferences`.
+- Uses `trip_id` to identify the requested preference record.
+- Returns the same field names used by `POST /preferences/`.
+- Returns the latest saved preference values.
+- Does not modify existing preference data.
+- Returns `404 Not Found` if no preference record exists for the supplied trip ID.
+
+### Database Mapping
+
+| API Field | Database Column |
+|---|---|
+| `trip_id` | `trip_preferences.trip_id` |
+| `budget` | `trip_preferences.budget_level` |
+| `transportation` | `trip_preferences.transport_mode` |
+| `pace` | `trip_preferences.pace` |
+| `interests` | `trip_preferences.interests` |
+
+### Error Responses
+
+| Status | Description |
+|---|---|
+| 404 | Preferences not found |
+| 422 | Invalid UUID format |
+
+Example 404 response:
+
+```json
+{
+  "detail": "Preferences not found"
+}
+```
+
+### Testing Results
+
+The following tests were completed using Swagger UI and the local FastAPI server:
+
+- Successful retrieval of saved preferences.
+- Successful POST-to-GET data consistency verification.
+- Correct `404 Not Found` response for a nonexistent preference record.
+- Invalid UUID input rejected by FastAPI validation.
+
+### Security Limitation
+
+The endpoint currently does not verify whether the authenticated user owns the requested trip.
+
+Authentication and trip ownership authorization must be implemented before production deployment.
+
+---
 ## 5. List Public Points of Interest
 
 **Method:** GET  
@@ -520,6 +611,18 @@ Call:
 `POST /preferences/`
 
 Supply the `trip_id` and preference values.
+
+### Step 6: Retrieve Saved Preferences
+
+Call:
+
+`GET /preferences/{trip_id}`
+
+Use the saved `trip_id` to retrieve previously stored preferences.
+
+The frontend can use the response to populate the preference form when a user reopens an existing trip.
+
+If the API returns `404`, no saved preference record exists for that trip.
 
 ### Important Integration Notes
 
