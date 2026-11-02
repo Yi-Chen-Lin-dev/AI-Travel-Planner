@@ -13,7 +13,8 @@
 >
 > Authentication, authorization, production CORS configuration, and frontend integration are not yet confirmed as complete.
 >
-> <img width="809" height="653" alt="image" src="https://github.com/user-attachments/assets/547c53ed-2992-4f1a-9a26-42d3f13ae443" />
+<img width="772" height="665" alt="image" src="https://github.com/user-attachments/assets/5104b9c8-414c-429b-a381-8d3f25b81144" />
+
 
 
 ---
