@@ -167,7 +167,7 @@ export default function Home() {
         onExploreAttraction={(attraction) => console.log('Explore:', attraction.name)}
         onSelectPlan={(plan) => console.log('Plan selected:', plan.title)}
         
-        onGenerateTrip={(prefs: {
+        onGenerateTrip={async (prefs: {
           destination?: string;
           startDate: string;
           endDate: string;
@@ -221,11 +221,27 @@ export default function Home() {
               pinned_spots: pinnedIds
             };
 
-            console.log("📅 Calculated Duration:", `${calculatedDays} Days, ${diffDays} Nights`);
-            console.log("🚀 Payload Ready for POST /preferences/:", JSON.stringify(preferencePayload, null, 2));
+                  // 1. สำรองข้อมูลลง localStorage
+      localStorage.setItem("trip_preferences", JSON.stringify(preferencePayload));
 
-            // 3. สั่งเปลี่ยนเส้นทางไปยังหน้ารายละเอียดทริป
-            router.push(`/itinerary?trip_id=${tripId}`);
+      // 2. ส่งข้อมูลจริงไปยัง Backend FastAPI
+      const response = await fetch("http://localhost:8000/preferences/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(preferencePayload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("✅ Preferences successfully saved to backend:", result);
+
+// 3. สั่งเปลี่ยนเส้นทางไปยังหน้ารายละเอียดทริป
+router.push(`/itinerary?trip_id=${tripId}`);
           } catch (error) {
             console.error("❌ Error saving preferences:", error);
             alert("Failed to save trip preferences. Please try again.");

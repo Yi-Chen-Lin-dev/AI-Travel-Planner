@@ -1,26 +1,48 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  /* ชุดสีหลักและสีพื้นหลัง */
+  --color-primary: #00BCD4;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #cbe6ff;
+  --color-on-primary-container: #001e30;
+  --color-secondary: #F26419;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #ffdbd1;
+  --color-on-secondary-container: #360f00;
+  --color-tertiary: #1a2942;
+  --color-on-tertiary: #ffffff;
+  
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f8f9fa;
+  --color-surface-container: #f1f3f5;
+  --color-surface-container-high: #e9ecef;
+  --color-surface-container-highest: #dee2e6;
+  --color-surface: #F4F1EA;
+  --color-on-surface: #212529;
+  --color-on-surface-variant: #495057;
+  
+  --color-outline: #ced4da;
+  --color-outline-variant: #e9ecef;
+  --color-inverse-surface: #343a40;
+  --color-inverse-on-surface: #f8f9fa;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* ระยะห่าง (Padding, Margin, Gap) */
+  --spacing-space-xs: 4px;
+  --spacing-space-sm: 8px;
+  --spacing-space-md: 16px;
+  --spacing-space-lg: 24px;
+  --spacing-space-xl: 32px;
+  --spacing-gutter: 24px;
+  --spacing-margin: 32px;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* ขนาดตัวอักษร */
+  --text-label-sm: 0.75rem;
+  --text-label-md: 0.875rem;
+  --text-body-sm: 0.875rem;
+  --text-body-md: 1rem;
+  --text-title-md: 1.125rem;
+  --text-headline-sm: 1.5rem;
+  --text-headline-md: 1.75rem;
+  --text-headline-lg: 2rem;
 }

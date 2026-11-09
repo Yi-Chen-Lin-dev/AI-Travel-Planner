@@ -1,29 +1,61 @@
 "use client";
-
+import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
 
 const PreferenceForm = () => {
-  
+  const router = useRouter();
+
+  // State ปรับชื่อฟิลด์และค่าเริ่มต้นให้ตรงกับ Backend Contract (ข้อ 1-4)
   const [formData, setFormData] = useState({
     destination: 'Taipei, Taiwan — Confirmed TW',
     startDate: '2025-09-18',
     endDate: '2025-09-21',
-    budget: 'moderate',
-    travelStyles: ['cafes', 'night_markets', 'nature'],
-    transit: 'mrt',
-    pacing: 'balanced'
+    budget: 'medium', // 'low' | 'medium' | 'high'
+    interests: ['food', 'culture', 'nature'], // 'food' | 'culture' | 'nature' | 'shopping' | 'entertainment'
+    transportation: 'public_transport', // 'walking' | 'public_transport' | 'driving'
+    pace: 'normal' // 'relaxed' | 'normal' | 'fast'
   });
 
-  // ฟังก์ชันจัดการการคลิกเลือกแบบหลายข้อ (Multi-select)
-  const toggleStyle = (styleId) => {
+  // คำนวณระยะเวลาเดินทางแบบไดนามิกจากวันที่จริง (ข้อ 5)
+  const calculateDuration = (start, end) => {
+    const startDateObj = new Date(start);
+    const endDateObj = new Date(end);
+    const diffTime = Math.abs(endDateObj.getTime() - startDateObj.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return {
+      days: diffDays + 1,
+      nights: diffDays
+    };
+  };
+
+  const duration = calculateDuration(formData.startDate, formData.endDate);
+
+  const toggleInterest = (interestKey) => {
     setFormData((prev) => {
-      const isSelected = prev.travelStyles.includes(styleId);
+      const isSelected = prev.interests.includes(interestKey);
       if (isSelected) {
-        return { ...prev, travelStyles: prev.travelStyles.filter(id => id !== styleId) };
+        return { ...prev, interests: prev.interests.filter(id => id !== interestKey) };
       } else {
-        return { ...prev, travelStyles: [...prev.travelStyles, styleId] };
+        return { ...prev, interests: [...prev.interests, interestKey] };
       }
     });
+  };
+
+  const handleSubmit = async () => {
+    // โครงสร้าง Request Payload สำหรับ POST /preferences/ (ข้อ 6)
+    const preferencePayload = {
+      trip_id: "temp-trip-uuid",
+      budget: formData.budget,
+      transportation: formData.transportation,
+      pace: formData.pace,
+      interests: formData.interests
+    };
+
+    console.log("📅 Dynamic Duration:", `${duration.days} Days / ${duration.nights} Nights`);
+    console.log("🚀 Payload for POST /preferences/:", preferencePayload);
+
+    alert("Trip preferences prepared successfully!");
+    router.push('/itinerary');
   };
 
   return (
@@ -63,31 +95,41 @@ const PreferenceForm = () => {
           </div>
           <div className="flex items-center gap-3 mt-3 text-sm">
             <span className="text-[#8C7A6B]">Popular this week:</span>
-            <span className="px-3 py-1 bg-white border border-[#D5C6B6] rounded-full text-[#5D4A3E] cursor-pointer hover:bg-[#F4ECE1]">Taipei</span>
-            <span className="px-3 py-1 bg-white border border-[#D5C6B6] rounded-full text-[#5D4A3E] cursor-pointer hover:bg-[#F4ECE1]">Tokyo</span>
-            <span className="px-3 py-1 bg-white border border-[#D5C6B6] rounded-full text-[#5D4A3E] cursor-pointer hover:bg-[#F4ECE1]">Chiang Mai</span>
+            <span onClick={() => setFormData({...formData, destination: 'Taipei, Taiwan'})} className="px-3 py-1 bg-white border border-[#D5C6B6] rounded-full text-[#5D4A3E] cursor-pointer hover:bg-[#F4ECE1]">Taipei</span>
+            <span onClick={() => setFormData({...formData, destination: 'Tamsui, Taiwan'})} className="px-3 py-1 bg-white border border-[#D5C6B6] rounded-full text-[#5D4A3E] cursor-pointer hover:bg-[#F4ECE1]">Tamsui</span>
+            <span onClick={() => setFormData({...formData, destination: 'Chiang Mai, Thailand'})} className="px-3 py-1 bg-white border border-[#D5C6B6] rounded-full text-[#5D4A3E] cursor-pointer hover:bg-[#F4ECE1]">Chiang Mai</span>
           </div>
         </section>
 
-        {/* 2. Travel Dates & Duration */}
+        {/* 2. Travel Dates & Duration (ข้อ 5) */}
         <section>
           <div className="flex justify-between items-end mb-2">
             <h2 className="text-lg font-semibold text-[#3E2723]">2. Travel Dates & Duration</h2>
-            <span className="text-sm font-medium text-[#A0522D]">Total 4 Days 3 Nights</span>
+            <span className="text-sm font-medium text-[#A0522D]">Total {duration.days} Days {duration.nights} Nights</span>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white border border-[#D5C6B6] rounded-xl p-3 flex items-center gap-3 shadow-sm">
               <svg className="w-6 h-6 text-[#8C7A6B]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-              <div>
+              <div className="w-full">
                 <p className="text-xs text-[#8C7A6B]">Start Date</p>
-                <p className="font-semibold text-[#3E2723]">18 Sep 2025</p>
+                <input
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                  className="font-semibold text-[#3E2723] bg-transparent outline-none w-full cursor-pointer"
+                />
               </div>
             </div>
             <div className="bg-white border border-[#D5C6B6] rounded-xl p-3 flex items-center gap-3 shadow-sm">
               <svg className="w-6 h-6 text-[#8C7A6B]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-              <div>
+              <div className="w-full">
                 <p className="text-xs text-[#8C7A6B]">End Date</p>
-                <p className="font-semibold text-[#3E2723]">21 Sep 2025</p>
+                <input
+                  type="date"
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                  className="font-semibold text-[#3E2723] bg-transparent outline-none w-full cursor-pointer"
+                />
               </div>
             </div>
           </div>
@@ -95,73 +137,61 @@ const PreferenceForm = () => {
             <span className="flex items-center gap-2 text-[#8C7A6B]">
               <span className="text-orange-400">☀️</span> Autumn cool breeze 24 - 28°C ideal for travel
             </span>
-            <span className="text-[#A0522D] font-medium cursor-pointer">Edit</span>
           </div>
         </section>
 
-        {/* 3. Budget Level */}
+        {/* 3. Budget Level (ข้อ 1: low | medium | high) */}
         <section>
           <h2 className="text-lg font-semibold text-[#3E2723] mb-3">3. Budget Level <span className="text-base font-normal text-[#8C7A6B]">(Per person, excluding flights)</span></h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Economy */}
-            <div 
-              onClick={() => setFormData({...formData, budget: 'economy'})}
-              className={`p-4 rounded-xl cursor-pointer transition-all border ${formData.budget === 'economy' ? 'bg-[#A0522D] text-white border-transparent shadow-md' : 'bg-white border-[#D5C6B6] text-[#3E2723] hover:border-[#A0522D]'}`}
-            >
-              <p className={`text-xs font-bold tracking-wide uppercase mb-1 ${formData.budget === 'economy' ? 'text-white/80' : 'text-[#8C7A6B]'}`}>Economy</p>
-              <p className="text-lg font-bold mb-1">&lt; $NT1,000</p>
-              <p className={`text-sm leading-tight ${formData.budget === 'economy' ? 'text-white/90' : 'text-[#8C7A6B]'}`}>Hostels & street food</p>
-            </div>
-            
-            {/* Moderate */}
-            <div 
-              onClick={() => setFormData({...formData, budget: 'moderate'})}
-              className={`p-4 rounded-xl cursor-pointer transition-all border relative overflow-hidden ${formData.budget === 'moderate' ? 'bg-[#A0522D] text-white border-transparent shadow-md' : 'bg-white border-[#D5C6B6] text-[#3E2723] hover:border-[#A0522D]'}`}
-            >
-              {formData.budget === 'moderate' && (
-                <div className="absolute top-4 right-3 bg-white text-[#A0522D] rounded-full p-0.5 z-10 shadow-sm">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
-                </div>
-              )}
-              <p className={`text-xs font-bold tracking-wide uppercase mb-1 pr-6 ${formData.budget === 'moderate' ? 'text-white/80' : 'text-[#8C7A6B]'}`}>Moderate</p>
-              {/* ปรับขนาดตัวอักษร บีบช่องไฟ และเว้นที่ว่างด้านขวา (pr-8) เพื่อไม่ให้ชนไอคอน */}
-              <p className="text-base sm:text-lg font-bold mb-1 tracking-tight pr-8">$NT15,000-$NT35,000</p>
-              <p className={`text-sm leading-tight ${formData.budget === 'moderate' ? 'text-white/90' : 'text-[#8C7A6B]'}`}>Boutique hotels, cafes & restaurants</p>
-            </div>
-
-            {/* Luxury */}
-            <div 
-              onClick={() => setFormData({...formData, budget: 'luxury'})}
-              className={`p-4 rounded-xl cursor-pointer transition-all border ${formData.budget === 'luxury' ? 'bg-[#A0522D] text-white border-transparent shadow-md' : 'bg-white border-[#D5C6B6] text-[#3E2723] hover:border-[#A0522D]'}`}
-            >
-              <p className={`text-xs font-bold tracking-wide uppercase mb-1 ${formData.budget === 'luxury' ? 'text-white/80' : 'text-[#8C7A6B]'}`}>Luxury</p>
-              <p className="text-lg font-bold mb-1">&gt; $35,000</p>
-              <p className={`text-sm leading-tight ${formData.budget === 'luxury' ? 'text-white/90' : 'text-[#8C7A6B]'}`}>5-star hotels & fine dining</p>
-            </div>
+            {[
+              { value: 'low', label: 'Low', range: '< NT$ 15k', desc: 'Hostels & street food' },
+              { value: 'medium', label: 'Medium', range: 'NT$ 15k-35k', desc: 'Boutique hotels & dining' },
+              { value: 'high', label: 'High', range: '> NT$ 50k', desc: '5-star & fine dining' }
+            ].map((item) => (
+              <div 
+                key={item.value}
+                onClick={() => setFormData({...formData, budget: item.value})}
+                className={`p-4 rounded-xl cursor-pointer transition-all border relative ${
+                  formData.budget === item.value 
+                    ? 'bg-[#A0522D] text-white border-transparent shadow-md' 
+                    : 'bg-white border-[#D5C6B6] text-[#3E2723] hover:border-[#A0522D]'
+                }`}
+              >
+                {formData.budget === item.value && (
+                  <div className="absolute top-4 right-3 bg-white text-[#A0522D] rounded-full p-0.5 z-10 shadow-sm">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                  </div>
+                )}
+                <p className={`text-xs font-bold tracking-wide uppercase mb-1 ${formData.budget === item.value ? 'text-white/80' : 'text-[#8C7A6B]'}`}>{item.label}</p>
+                <p className="text-lg font-bold mb-1">{item.range}</p>
+                <p className={`text-sm leading-tight ${formData.budget === item.value ? 'text-white/90' : 'text-[#8C7A6B]'}`}>{item.desc}</p>
+              </div>
+            ))}
           </div>
         </section>
 
-        {/* 4. Preferred Travel Style */}
+        {/* 4. Interests (ข้อ 4: 5 หมวดหลัก) */}
         <section>
           <div className="flex justify-between items-end mb-3">
-            <h2 className="text-lg font-semibold text-[#3E2723]">4. Preferred Travel Style & Vibe</h2>
+            <h2 className="text-lg font-semibold text-[#3E2723]">4. Interests</h2>
             <span className="text-sm text-[#8C7A6B]">Multi-select</span>
           </div>
           <div className="flex flex-wrap gap-3">
             {[
-              { id: 'cafes', label: '☕ Cafes & Photo Spots' },
-              { id: 'night_markets', label: '🍜 Night Markets & Street Food' },
-              { id: 'shopping', label: '🛍️ Shopping & Boutiques' },
+              { id: 'food', label: '🍜 Food & Night Markets' },
+              { id: 'culture', label: '🏛️ Culture & Ancient Temples' },
               { id: 'nature', label: '⛰️ Nature & Scenery' },
-              { id: 'history', label: '🏛️ History & Ancient Temples' },
-              { id: 'wellness', label: '♨️ Hot Springs & Wellness' },
+              { id: 'shopping', label: '🛍️ Shopping & Boutiques' },
+              { id: 'entertainment', label: '☕ Entertainment & Cafes' }
             ].map((style) => {
-              const isSelected = formData.travelStyles.includes(style.id);
+              const isSelected = formData.interests.includes(style.id);
               return (
                 <button
                   key={style.id}
-                  onClick={() => toggleStyle(style.id)}
-                  className={`px-4 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-2 border ${
+                  type="button"
+                  onClick={() => toggleInterest(style.id)}
+                  className={`px-4 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-2 border cursor-pointer ${
                     isSelected 
                       ? 'bg-[#A0522D] text-white border-transparent shadow-sm' 
                       : 'bg-white text-[#5D4A3E] border-[#D5C6B6] hover:bg-[#F4ECE1]'
@@ -177,74 +207,68 @@ const PreferenceForm = () => {
           </div>
         </section>
 
-       {/* 5 & 6. Transit and Pacing */}
+        {/* 5 & 6. Transportation and Pace */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* 5. Transit */}
+          {/* 5. Transportation (ข้อ 2: walking | public_transport | driving) */}
           <section>
-            <h2 className="text-lg font-semibold text-[#3E2723] mb-3">5. Primary Transit</h2>
+            <h2 className="text-lg font-semibold text-[#3E2723] mb-3">5. Transportation</h2>
             <div className="space-y-3">
-              <div 
-                onClick={() => setFormData({...formData, transit: 'mrt'})}
-                className={`p-3 rounded-xl cursor-pointer border flex items-center gap-3 transition-all ${formData.transit === 'mrt' ? 'bg-[#A0522D] text-white border-transparent shadow-md' : 'bg-white border-[#D5C6B6] text-[#3E2723] hover:border-[#A0522D]'}`}
-              >
-                <div className="text-xl">🚆</div>
-                <div>
-                  <p className="font-semibold">MRT / Metro</p>
-                  <p className={`text-xs ${formData.transit === 'mrt' ? 'text-white/80' : 'text-[#8C7A6B]'}`}>Recommended for Taipei</p>
+              {[
+                { value: 'public_transport', label: 'Public Transit', desc: 'MRT, Metro & Public Buses', icon: '🚆' },
+                { value: 'walking', label: 'Walking', desc: 'Pedestrian friendly routes', icon: '🚶' },
+                { value: 'driving', label: 'Driving', desc: 'Car & Taxi', icon: '🚗' },
+              ].map((item) => (
+                <div 
+                  key={item.value}
+                  onClick={() => setFormData({...formData, transportation: item.value})}
+                  className={`p-3 rounded-xl cursor-pointer border flex items-center justify-between transition-all ${
+                    formData.transportation === item.value 
+                      ? 'bg-[#A0522D] text-white border-transparent shadow-md' 
+                      : 'bg-white border-[#D5C6B6] text-[#3E2723] hover:border-[#A0522D]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="text-xl">{item.icon}</div>
+                    <div>
+                      <p className="font-semibold">{item.label}</p>
+                      <p className={`text-xs ${formData.transportation === item.value ? 'text-white/80' : 'text-[#8C7A6B]'}`}>{item.desc}</p>
+                    </div>
+                  </div>
+                  {formData.transportation === item.value && (
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                  )}
                 </div>
-              </div>
-              <div 
-                onClick={() => setFormData({...formData, transit: 'bus'})}
-                className={`p-3 rounded-xl cursor-pointer border flex items-center gap-3 transition-all ${formData.transit === 'bus' ? 'bg-[#A0522D] text-white border-transparent shadow-md' : 'bg-white border-[#D5C6B6] text-[#3E2723] hover:border-[#A0522D]'}`}
-              >
-                <div className="text-xl">🚌</div>
-                <div>
-                  <p className="font-semibold">Public Bus & Walking</p>
-                  <p className={`text-xs ${formData.transit === 'bus' ? 'text-white/80' : 'text-[#8C7A6B]'}`}>For alleyway exploring</p>
-                </div>
-              </div>
-              {/* ตัวเลือกใหม่: Taxi / Uber */}
-              <div 
-                onClick={() => setFormData({...formData, transit: 'taxi'})}
-                className={`p-3 rounded-xl cursor-pointer border flex items-center gap-3 transition-all ${formData.transit === 'taxi' ? 'bg-[#A0522D] text-white border-transparent shadow-md' : 'bg-white border-[#D5C6B6] text-[#3E2723] hover:border-[#A0522D]'}`}
-              >
-                <div className="text-xl">🚕</div>
-                <div>
-                  <p className="font-semibold">Taxi / Uber</p>
-                  <p className={`text-xs ${formData.transit === 'taxi' ? 'text-white/80' : 'text-[#8C7A6B]'}`}>Fast & convenient</p>
-                </div>
-              </div>
+              ))}
             </div>
           </section>
 
-          {/* 6. Pacing */}
+          {/* 6. Pace (ข้อ 3: relaxed | normal | fast) */}
           <section>
-            <h2 className="text-lg font-semibold text-[#3E2723] mb-3">6. Trip Pacing</h2>
+            <h2 className="text-lg font-semibold text-[#3E2723] mb-3">6. Trip Pace</h2>
             <div className="space-y-3">
-              <div 
-                onClick={() => setFormData({...formData, pacing: 'balanced'})}
-                className={`p-3 rounded-xl cursor-pointer border flex items-center justify-between transition-all ${formData.pacing === 'balanced' ? 'bg-[#A0522D] text-white border-transparent shadow-md' : 'bg-white border-[#D5C6B6] text-[#3E2723] hover:border-[#A0522D]'}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="text-xl">⏱️</div>
-                  <p className="font-semibold">Balanced: 3-4 spots/day</p>
+              {[
+                { value: 'relaxed', label: 'Slow Travel: 1-2 spots/day', icon: '⏰' },
+                { value: 'normal', label: 'Balanced: 3-4 spots/day', icon: '⏱️' },
+                { value: 'fast', label: 'Fast Paced: 5+ spots/day', icon: '⚡' },
+              ].map((item) => (
+                <div 
+                  key={item.value}
+                  onClick={() => setFormData({...formData, pace: item.value})}
+                  className={`p-3 rounded-xl cursor-pointer border flex items-center justify-between transition-all ${
+                    formData.pace === item.value 
+                      ? 'bg-[#A0522D] text-white border-transparent shadow-md' 
+                      : 'bg-white border-[#D5C6B6] text-[#3E2723] hover:border-[#A0522D]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="text-xl">{item.icon}</div>
+                    <p className="font-semibold">{item.label}</p>
+                  </div>
+                  {formData.pace === item.value && (
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  )}
                 </div>
-                {formData.pacing === 'balanced' && (
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                )}
-              </div>
-              <div 
-                onClick={() => setFormData({...formData, pacing: 'slow'})}
-                className={`p-3 rounded-xl cursor-pointer border flex items-center justify-between transition-all ${formData.pacing === 'slow' ? 'bg-[#A0522D] text-white border-transparent shadow-md' : 'bg-white border-[#D5C6B6] text-[#3E2723] hover:border-[#A0522D]'}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="text-xl">⏰</div>
-                  <p className="font-semibold">Slow Travel: 1-2 spots/day</p>
-                </div>
-                {formData.pacing === 'slow' && (
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                )}
-              </div>
+              ))}
             </div>
           </section>
         </div>
@@ -259,13 +283,16 @@ const PreferenceForm = () => {
             <span className="text-[#8C7A6B]">AI Accuracy 99.4%</span>
           </div>
           <button 
-            className="w-full bg-[#A0522D] hover:bg-[#8A4525] text-white font-semibold text-lg py-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2"
+            type="button"
+            onClick={handleSubmit}
+            className="w-full bg-[#A0522D] hover:bg-[#8A4525] text-white font-semibold text-lg py-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 cursor-pointer"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path></svg>
-            ✨ Generate Intelligent AI Trip (4D3N) <span className="ml-1">→</span>
+            ✨ Generate Intelligent AI Trip ({duration.days}D{duration.nights}N) <span className="ml-1">→</span>
           </button>
-          <p className="text-center text-xs text-[#8C7A6B] mt-3">
-            Auto-saved to "My Trips". Ready to export and share with travel companions.
+          <p onClick={() => router.push('/itinerary')}
+             className="text-center text-xs text-[#8C7A6B] mt-3 cursor-pointer hover:underline">
+            Auto-saved to My Trips. Ready to export and share with travel companions.
           </p>
         </section>
 
