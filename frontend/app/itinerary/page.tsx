@@ -1,8 +1,18 @@
 'use client';
 
-import React, { useState, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from '../../components/Header';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
+interface SavedPreferences {
+  trip_id: string;
+  budget: 'low' | 'medium' | 'high' | null;
+  transportation: 'walking' | 'public_transport' | 'driving' | null;
+  pace: 'relaxed' | 'normal' | 'fast' | null;
+  interests: string[] | null;
+}
 
 // ฐานข้อมูลสถานที่จำลองแยกตามหมวดหมู่ (Interests / Vibes)
 const POI_DATABASE = [
@@ -160,45 +170,144 @@ const POI_DATABASE = [
   }
 ];
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function ItineraryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tripId = searchParams.get('trip_id') || 'trip-sample-01';
+  const tripId = searchParams.get('trip_id') || '';
 
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [savedPrefs, setSavedPrefs] = useState<SavedPreferences | null>(null);
+  const [tripMeta, setTripMeta] = useState<{ title?: string; destination?: string; start_date?: string; end_date?: string }>({});
+  const [isLoadingPrefs, setIsLoadingPrefs] = useState(false);
+  const [apiSyncStatus, setApiSyncStatus] = useState<'synced' | 'fallback' | 'error'>('fallback');
 
-  const simulatedDays = useMemo(() => {
-    return [
-      {
-        dayNumber: 1,
-        dateStr: '18 Sep',
-        theme: 'Historical Heritage & Skyline Views',
-        routeStats: { totalDistanceKm: 16.2, totalTransitMinutes: 65, weather: 'Sunny 29°C', primaryMrtLine: 'MRT Red Line' },
-        stops: [POI_DATABASE[3], POI_DATABASE[1], POI_DATABASE[7], POI_DATABASE[5], POI_DATABASE[0]]
-      },
-      {
-        dayNumber: 2,
-        dateStr: '19 Sep',
-        theme: 'Creative Culture & Street Fashion',
-        routeStats: { totalDistanceKm: 12.8, totalTransitMinutes: 45, weather: 'Partly Cloudy 28°C', primaryMrtLine: 'MRT Blue Line' },
-        stops: [POI_DATABASE[9], POI_DATABASE[8], POI_DATABASE[10], POI_DATABASE[2]]
-      },
-      {
-        dayNumber: 3,
-        dateStr: '20 Sep',
-        theme: 'Riverside Sunset & Coastal Atmosphere',
-        routeStats: { totalDistanceKm: 24.5, totalTransitMinutes: 85, weather: 'Pleasant Breeze 27°C', primaryMrtLine: 'MRT Tamsui Line' },
-        stops: [POI_DATABASE[4], POI_DATABASE[6], POI_DATABASE[0]]
-      },
-      {
-        dayNumber: 4,
-        dateStr: '21 Sep',
-        theme: 'Artisan Souvenirs & Cafe Relaxation',
-        routeStats: { totalDistanceKm: 9.4, totalTransitMinutes: 35, weather: 'Sunny 30°C', primaryMrtLine: 'MRT Bannan Line' },
-        stops: [POI_DATABASE[10], POI_DATABASE[7], POI_DATABASE[1]]
+  // Step 6 (Section 9 & 4A): ดึงค่าที่บันทึกไว้จริงจาก GET /preferences/{trip_id}
+  useEffect(() => {
+    // อ่านข้อมูลเสริมจาก localStorage (เช่น title, destination, start_date, end_date)
+    try {
+      const localRaw = window.localStorage.getItem('trip_preferences');
+      if (localRaw) {
+        const parsed = JSON.parse(localRaw);
+        setTripMeta({
+          title: parsed.title,
+          destination: parsed.destination,
+          start_date: parsed.start_date,
+          end_date: parsed.end_date,
+        });
+        if (!UUID_REGEX.test(tripId)) {
+          setSavedPrefs({
+            trip_id: parsed.trip_id || 'local-draft',
+            budget: parsed.budget || 'medium',
+            transportation: parsed.transportation || 'public_transport',
+            pace: parsed.pace || 'normal',
+            interests: parsed.interests || ['food', 'culture', 'nature'],
+          });
+        }
       }
+    } catch {
+      // ignore localStorage parse error
+    }
+
+    if (!UUID_REGEX.test(tripId)) return;
+
+    let isMounted = true;
+    const fetchSavedPreferences = async () => {
+      setIsLoadingPrefs(true);
+      try {
+        const res = await fetch(`${API_BASE_URL}/preferences/${encodeURIComponent(tripId)}`);
+        if (!res.ok) {
+          if (isMounted) setApiSyncStatus('error');
+          return;
+        }
+        const data: SavedPreferences = await res.json();
+        if (isMounted) {
+          setSavedPrefs(data);
+          setApiSyncStatus('synced');
+          console.log('✅ Retrieved saved preferences from GET /preferences/{trip_id}:', data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch preferences from backend:', err);
+        if (isMounted) setApiSyncStatus('error');
+      } finally {
+        if (isMounted) setIsLoadingPrefs(false);
+      }
+    };
+
+    fetchSavedPreferences();
+    return () => {
+      isMounted = false;
+    };
+  }, [tripId]);
+
+  // จัดตารางวันโดยปรับตาม interests และ pace ที่ดึงมาจาก Backend V2 จริง
+  const simulatedDays = useMemo(() => {
+    const activeInterests =
+      savedPrefs?.interests && savedPrefs.interests.length > 0
+        ? savedPrefs.interests
+        : ['food', 'culture', 'nature'];
+
+    const stopsPerDay =
+      savedPrefs?.pace === 'relaxed' ? 2 : savedPrefs?.pace === 'fast' ? 5 : 4;
+
+    // เรียง POI โดยให้หมวดหมู่ที่ผู้ใช้เลือกขึ้นก่อน
+    const prioritizedPois = [
+      ...POI_DATABASE.filter((p) => activeInterests.includes(p.category)),
+      ...POI_DATABASE.filter((p) => !activeInterests.includes(p.category)),
     ];
-  }, []);
+
+    // คำนวณจำนวนวันจาก start_date และ end_date (ถ้ามี) หรือใช้ค่าเริ่มต้น 4 วัน
+    let totalDays = 4;
+    let startObj: Date | null = null;
+    if (tripMeta.start_date && tripMeta.end_date) {
+      const s = new Date(tripMeta.start_date);
+      const e = new Date(tripMeta.end_date);
+      if (!Number.isNaN(s.getTime()) && !Number.isNaN(e.getTime()) && e >= s) {
+        startObj = s;
+        totalDays = Math.min(10, Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+      }
+    }
+
+    const themes = [
+      'Historical Heritage & Skyline Views',
+      'Creative Culture & Street Fashion',
+      'Riverside Sunset & Coastal Atmosphere',
+      'Artisan Souvenirs & Cafe Relaxation',
+    ];
+
+    return Array.from({ length: totalDays }, (_, dayIdx) => {
+      let dateLabel = `${18 + dayIdx} Sep`;
+      if (startObj) {
+        const d = new Date(startObj);
+        d.setDate(startObj.getDate() + dayIdx);
+        dateLabel = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      }
+
+      const dayStops = Array.from({ length: stopsPerDay }, (_, stopIdx) => {
+        const poiIdx = (dayIdx * stopsPerDay + stopIdx) % prioritizedPois.length;
+        return prioritizedPois[poiIdx];
+      });
+
+      return {
+        dayNumber: dayIdx + 1,
+        dateStr: dateLabel,
+        theme: themes[dayIdx % themes.length],
+        routeStats: {
+          totalDistanceKm: Number((8.5 + stopsPerDay * 2.1 + dayIdx * 1.4).toFixed(1)),
+          totalTransitMinutes: stopsPerDay * 15 + dayIdx * 5,
+          weather: 'Sunny 29°C',
+          primaryMrtLine:
+            savedPrefs?.transportation === 'walking'
+              ? 'Pedestrian Route'
+              : savedPrefs?.transportation === 'driving'
+              ? 'Expressway & City Drive'
+              : 'MRT Red & Blue Line',
+        },
+        stops: dayStops,
+      };
+    });
+  }, [savedPrefs, tripMeta]);
 
   const currentDay = simulatedDays[selectedDayIndex] || simulatedDays[0];
 
@@ -212,21 +321,54 @@ function ItineraryContent() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-on-surface-variant text-xs sm:text-sm flex-wrap">
               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary text-on-primary font-semibold shadow-xs">
-                <span className="material-symbols-outlined text-[15px]">add_circle</span>
-                Home Trip Planner
+                <span className="material-symbols-outlined text-[15px]">check_circle</span>
+                Trip Itinerary
               </span>
               <span className="text-outline-variant">•</span>
-              <span className="text-primary font-semibold">AI Trip Planner & Creator 4.0</span>
+              <span className="text-primary font-semibold">
+                {tripMeta.title || 'AI Trip Planner & Creator 4.0'}
+              </span>
+              {tripId && (
+                <>
+                  <span className="text-outline-variant">•</span>
+                  <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-surface-container text-on-surface-variant">
+                    ID: {tripId.slice(0, 8)}...
+                  </span>
+                </>
+              )}
             </div>
+
+            {/* แถบแสดงค่า Preferences ที่ดึงมาจาก GET /preferences/{trip_id} */}
+            {savedPrefs && (
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="px-2.5 py-1 rounded-lg bg-secondary-container text-on-secondary-container font-semibold capitalize">
+                  Budget: {savedPrefs.budget || 'medium'}
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-secondary-container text-on-secondary-container font-semibold capitalize">
+                  Transit: {(savedPrefs.transportation || 'public_transport').replace('_', ' ')}
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-secondary-container text-on-secondary-container font-semibold capitalize">
+                  Pace: {savedPrefs.pace || 'normal'}
+                </span>
+                {savedPrefs.interests && savedPrefs.interests.length > 0 && (
+                  <span className="px-2.5 py-1 rounded-lg bg-primary-fixed text-on-primary-fixed-variant font-semibold capitalize">
+                    Styles: {savedPrefs.interests.join(', ')}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
             <div className="lg:col-span-8 space-y-1">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-on-surface">
-                Intelligent Trip Creator — <span className="text-primary">Automated Routing & Scheduling</span>
+                {tripMeta.destination ? `${tripMeta.destination} — ` : 'Intelligent Trip Creator — '}
+                <span className="text-primary">Personalized Schedule</span>
               </h1>
               <p className="text-sm text-on-surface-variant max-w-3xl">
-                Simulated optimal itinerary with curated spots, real-time transit times, and localized sequencing to minimize travel fatigue.
+                {isLoadingPrefs
+                  ? 'Loading saved preferences from PostgreSQL V2 backend...'
+                  : 'Optimal itinerary tailored from your saved trip preferences, transit mode, and daily pace.'}
               </p>
             </div>
             <div className="lg:col-span-4 flex lg:justify-end">
@@ -235,8 +377,12 @@ function ItineraryContent() {
                   <span className="material-symbols-outlined text-[20px]">auto_awesome</span>
                 </div>
                 <div>
-                  <p className="text-[11px] text-on-surface-variant uppercase font-bold tracking-wider">AI Calculation Engine</p>
-                  <p className="text-sm font-semibold text-on-surface">Balanced & Smart Transit</p>
+                  <p className="text-[11px] text-on-surface-variant uppercase font-bold tracking-wider">
+                    Database Status
+                  </p>
+                  <p className="text-sm font-semibold text-on-surface">
+                    {apiSyncStatus === 'synced' ? 'Synced with PostgreSQL V2' : 'Local Preview Mode'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -247,11 +393,9 @@ function ItineraryContent() {
       {/* MAIN ITINERARY WORKSPACE */}
       <main className="w-full max-w-7xl mx-auto px-4 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
           {/* ซ้าย (7 ส่วน): ตารางวัน + รายการสถานที่ */}
           <div className="lg:col-span-7 flex flex-col space-y-4">
-            
-            {/* แถบเลือกวัน 1-4 */}
+            {/* แถบเลือกวัน */}
             <div className="bg-surface-container-low p-1.5 rounded-xl flex items-center gap-2 overflow-x-auto shadow-xs border border-outline-variant/30">
               {simulatedDays.map((d, index) => {
                 const isActive = selectedDayIndex === index;
@@ -271,7 +415,7 @@ function ItineraryContent() {
               })}
             </div>
 
-            {/* กล่องสรุปสถิติประจำวัน (Day Route Stats) */}
+            {/* กล่องสรุปสถิติประจำวัน */}
             <div className="bg-surface-container-low rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs border border-outline-variant/30">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center shrink-0">
@@ -292,12 +436,12 @@ function ItineraryContent() {
               </div>
             </div>
 
-            {/* ไทม์ไลน์จุดแวะ (Simulated POI Stops) */}
+            {/* ไทม์ไลน์จุดแวะ */}
             <div className="relative pl-7 sm:pl-8 space-y-4">
               <div className="absolute left-3.5 sm:left-4 top-4 bottom-4 w-0.5 bg-outline-variant/50 -translate-x-1/2" />
 
               {currentDay.stops.map((stop, idx) => (
-                <React.Fragment key={stop.id}>
+                <React.Fragment key={`${stop.id}-${idx}`}>
                   <div className="relative group">
                     <div className="w-6 h-6 rounded-full bg-primary text-on-primary text-[11px] font-bold flex items-center justify-center shadow-xs absolute -left-7 sm:-left-8 top-4">
                       {idx + 1}
@@ -318,16 +462,14 @@ function ItineraryContent() {
                               <span className="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed-variant text-[11px] font-bold">
                                 {stop.timeSlot}
                               </span>
-                              <span className="text-[11px] text-outline font-medium">
-                                {stop.district}
-                              </span>
+                              <span className="text-[11px] text-outline font-medium">{stop.district}</span>
                             </div>
                             <h3 className="text-base font-bold text-on-surface mt-1">{stop.name}</h3>
                             <p className="text-xs text-on-surface-variant mt-1 line-clamp-2 leading-relaxed">
                               {stop.description}
                             </p>
                           </div>
-                          
+
                           <div className="flex items-center gap-3 pt-2 mt-2 text-xs text-on-surface-variant flex-wrap border-t border-outline-variant/20">
                             <span className="flex items-center gap-1 font-semibold text-primary">
                               <span className="material-symbols-outlined text-[14px]">subway</span>
@@ -364,7 +506,7 @@ function ItineraryContent() {
               </span>
               <button
                 type="button"
-                onClick={() => router.push('/')}
+                onClick={() => router.push(tripId ? `/?trip_id=${encodeURIComponent(tripId)}` : '/')}
                 className="px-4 py-2 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary-container transition-all cursor-pointer whitespace-nowrap shadow-xs"
               >
                 Edit Trip Preferences
@@ -382,21 +524,25 @@ function ItineraryContent() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => router.push('/')}
+                  onClick={() => router.push(tripId ? `/?trip_id=${encodeURIComponent(tripId)}` : '/')}
                   className="text-xs text-primary font-semibold hover:underline cursor-pointer"
                 >
                   Edit in Planner ➔
                 </button>
               </div>
 
-              <div className="relative w-full h-[340px] rounded-lg overflow-hidden shadow-inner bg-cover bg-center border border-outline-variant/20"
-                style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDyM6_U5yRkTdnUTEZuPPmYOzTeGLVM0tS6bwUK0BH6D9kew7BvY6eGt3geAcM9c6F2PLBdk8DNP4h1biQ_OaK6_nwLznu92crzLsV5x494L30atDo4qC61obB6nsCfPeNFDRknaRv_855XHDgH9f5OLkTW006mgfqJeO02LKNBsXrzHGRywxu8CxymmJGiP-AsLAVnQul5sMw5IpiCaqvQ9NhzBjdKdfjEMNC24UuH5_fSlgZHNhY')" }}
+              <div
+                className="relative w-full h-[340px] rounded-lg overflow-hidden shadow-inner bg-cover bg-center border border-outline-variant/20"
+                style={{
+                  backgroundImage:
+                    "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDyM6_U5yRkTdnUTEZuPPmYOzTeGLVM0tS6bwUK0BH6D9kew7BvY6eGt3geAcM9c6F2PLBdk8DNP4h1biQ_OaK6_nwLznu92crzLsV5x494L30atDo4qC61obB6nsCfPeNFDRknaRv_855XHDgH9f5OLkTW006mgfqJeO02LKNBsXrzHGRywxu8CxymmJGiP-AsLAVnQul5sMw5IpiCaqvQ9NhzBjdKdfjEMNC24UuH5_fSlgZHNhY')",
+                }}
               >
                 <div className="absolute inset-0 bg-inverse-surface/10 pointer-events-none" />
 
                 {currentDay.stops.map((stop, sIdx) => (
                   <div
-                    key={stop.id}
+                    key={`${stop.id}-pin-${sIdx}`}
                     className="absolute flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-lowest/90 backdrop-blur shadow-xs text-on-surface text-[10px] font-bold border border-outline-variant/30 transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 hover:scale-110 cursor-pointer"
                     style={{ top: stop.mapCoords.top, left: stop.mapCoords.left }}
                     title={stop.name}
@@ -430,32 +576,33 @@ function ItineraryContent() {
                   AI Smart Advisory
                 </span>
                 <span className="text-[10px] font-bold text-secondary bg-secondary-fixed/50 px-2 py-0.5 rounded-full">
-                  SYNCED
+                  {apiSyncStatus === 'synced' ? 'API V2 SYNCED' : 'LOCAL MODE'}
                 </span>
               </div>
               <p className="text-xs text-on-surface-variant leading-relaxed">
-                💡 <strong className="text-on-surface font-semibold">Route Tip:</strong> Day {currentDay.dayNumber} focuses on <em>{currentDay.theme}</em>. Sequential routing prioritizes {currentDay.routeStats.primaryMrtLine} corridors to keep average station transfers under 12 minutes.
+                💡 <strong className="text-on-surface font-semibold">Route Tip:</strong> Day {currentDay.dayNumber} focuses on{' '}
+                <em>{currentDay.theme}</em>. Sequential routing prioritizes {currentDay.routeStats.primaryMrtLine} corridors to keep average station transfers under 12 minutes.
               </p>
             </div>
           </div>
-
         </div>
       </main>
     </div>
   );
 }
 
-// ครอบ Suspense เพื่อไม่ให้เกิด Error useSearchParams() prerender
 export default function ItineraryPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#F4F1EA] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-semibold text-on-surface-variant">Loading trip itinerary...</span>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#F4F1EA] flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm font-semibold text-on-surface-variant">Loading trip itinerary...</span>
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <ItineraryContent />
     </Suspense>
   );

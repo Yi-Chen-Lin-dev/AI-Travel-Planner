@@ -1,15 +1,52 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '../components/Header';
 import { HomeView } from '../components/HomeView';
 import { Attraction, TripPlan } from '../types/trip';
 
+// TODO: แทนที่ด้วย user_id จริงที่สร้างจากตาราง public.users ใน PostgreSQL (จนกว่าจะมีระบบ LINE Login)
+
+const TEST_USER_ID = '50048c95-b993-4a00-b13e-8e82262d7ec8';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
+// ฟังก์ชันช่วยแปลงค่าจากฟอร์มให้ตรงตาม Allowed Values ใน API_CONTRACT.md V2
+const normalizeBudget = (val: string): 'low' | 'medium' | 'high' => {
+  const v = val?.toLowerCase().trim();
+  if (v === 'low' || v === 'budget') return 'low';
+  if (v === 'high' || v === 'luxury') return 'high';
+  return 'medium';
+};
+
+const normalizeTransportation = (val: string): 'walking' | 'public_transport' | 'driving' => {
+  const v = val?.toLowerCase().trim();
+  if (v === 'walking' || v === 'walk') return 'walking';
+  if (v === 'driving' || v === 'car' || v === 'taxi') return 'driving';
+  return 'public_transport';
+};
+
+const normalizePace = (val: string): 'relaxed' | 'normal' | 'fast' => {
+  const v = val?.toLowerCase().trim();
+  if (v === 'relaxed' || v === 'slow') return 'relaxed';
+  if (v === 'fast' || v === 'packed') return 'fast';
+  return 'normal';
+};
+
+const ALLOWED_INTERESTS = new Set([
+  'food',
+  'culture',
+  'nature',
+  'shopping',
+  'entertainment',
+]);
+
 export default function Home() {
   const router = useRouter();
 
-  // สร้าง State สำหรับเก็บไอดีสถานที่ที่ถูกปักหมุด โดยอ่านค่าเริ่มต้นจาก localStorage
+  // เก็บ draftTripId ไว้กรณีสร้างทริปสำเร็จแล้วแต่บันทึก preferences ไม่ผ่าน (ตาม Section 9 ของ API Contract)
+  const [draftTripId, setDraftTripId] = useState<string | null>(null);
+
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => {
     if (typeof window === 'undefined') return ['1'];
     try {
@@ -17,20 +54,13 @@ export default function Home() {
       if (!saved) return ['1'];
       const data: unknown = JSON.parse(saved);
       if (!Array.isArray(data)) return ['1'];
-      const result: string[] = [];
-      for (let i = 0; i < data.length; i++) {
-        const val = data[i];
-        if (typeof val === 'string') {
-          result.push(val);
-        }
-      }
+      const result = data.filter((val): val is string => typeof val === 'string');
       return result.length > 0 ? result : ['1'];
     } catch {
       return ['1'];
     }
   });
 
-  // ฟังก์ชันสลับสถานะ Pin/Unpin และบันทึกลง localStorage ทันที
   const handleTogglePin = (id: string) => {
     setPinnedIds((prev) => {
       const updated = prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id];
@@ -166,8 +196,8 @@ export default function Home() {
         onSelectTab={(tab) => console.log('Tab selected:', tab)}
         onExploreAttraction={(attraction) => console.log('Explore:', attraction.name)}
         onSelectPlan={(plan) => console.log('Plan selected:', plan.title)}
-        
         onGenerateTrip={async (prefs: {
+          title?: string;
           destination?: string;
           startDate: string;
           endDate: string;
@@ -179,9 +209,9 @@ export default function Home() {
           dailyEndTime?: string;
         }) => {
           try {
-            // 1. ตรวจสอบและคำนวณ Trip Duration จากวันที่เลือกจริง (Validate days >= 1)
+            // 1. ตรวจสอบวันที่เดินทาง (ไม่เก็บ days แยก ตามแนวทางของทีม แต่ตรวจสอบความถูกต้องของวันที่)
             if (!prefs.startDate || !prefs.endDate) {
-              alert("กรุณาเลือกวันที่เริ่มต้นและสิ้นสุดการเดินทาง");
+              alert('กรุณาเลือกวันที่เริ่มต้นและสิ้นสุดการเดินทาง');
               return;
             }
 
@@ -189,65 +219,91 @@ export default function Home() {
             const end = new Date(prefs.endDate);
 
             if (end < start) {
-              alert("วันที่สิ้นสุดต้องไม่เกิดขึ้นก่อนวันที่เริ่มต้น");
+              alert('วันที่สิ้นสุดต้องไม่เกิดขึ้นก่อนวันที่เริ่มต้น');
               return;
             }
 
-            const diffDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-            const calculatedDays = diffDays + 1;
+            const destinationName = (prefs.destination || 'Taipei').trim();
+            const tripTitle = (prefs.title || `${destinationName} Trip`).slice(0, 200);
 
-            if (calculatedDays < 1) {
-              alert("จำนวนวันเดินทางต้องมีอย่างน้อย 1 วัน (days >= 1)");
-              return;
+            // 2. ขั้นที่ 1: สร้าง Draft Trip ผ่าน POST /trips/ (ถ้ายังไม่เคยสร้างในรอบนี้)
+            let activeTripId = draftTripId;
+
+            if (!activeTripId) {
+              const tripResponse = await fetch(`${API_BASE_URL}/trips/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  user_id: TEST_USER_ID,
+                  title: tripTitle,
+                }),
+              });
+
+              if (!tripResponse.ok) {
+                const errData = await tripResponse.json().catch(() => ({}));
+                throw new Error(errData.detail || `Failed to create trip (${tripResponse.status})`);
+              }
+
+              const createdTrip = await tripResponse.json();
+              activeTripId = createdTrip.trip_id;
+              setDraftTripId(activeTripId);
+              console.log('✅ Step 1 — Draft trip created:', createdTrip);
             }
 
-            // 2. จัดรูปแบบ Payload ให้ครบทั้ง 11 ฟิลด์ตามข้อกำหนดของ Issue #13 และ DATA_CONTRACT.md
-            const tripId = typeof crypto !== 'undefined' && crypto.randomUUID 
-              ? crypto.randomUUID() 
-              : "b4f2c98a-78d1-419b-a31f-0e123456789a";
+            // 3. ขั้นที่ 2: บันทึก Preferences ผ่าน POST /preferences/ ตามสเปก API_CONTRACT.md V2
+            const sanitizedInterests = (prefs.interests || [])
+              .map((item) => item.toLowerCase().trim())
+              .filter((item) => ALLOWED_INTERESTS.has(item));
 
-            const preferencePayload = {
-              trip_id: tripId,
-              destination: prefs.destination || "Taipei",
-              start_date: prefs.startDate,
-              days: calculatedDays,
-              budget: prefs.budget,
-              transportation: prefs.transportation,
-              pace: prefs.pace,
-              interests: prefs.interests,
-              daily_start_time: prefs.dailyStartTime || "09:00",
-              daily_end_time: prefs.dailyEndTime || "21:00",
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Taipei",
-              pinned_spots: pinnedIds
+            const apiPreferencePayload = {
+              trip_id: activeTripId,
+              budget: normalizeBudget(prefs.budget),
+              transportation: normalizeTransportation(prefs.transportation),
+              pace: normalizePace(prefs.pace),
+              interests: sanitizedInterests,
             };
 
-                  // 1. สำรองข้อมูลลง localStorage
-      localStorage.setItem("trip_preferences", JSON.stringify(preferencePayload));
+            const prefResponse = await fetch(`${API_BASE_URL}/preferences/`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(apiPreferencePayload),
+            });
 
-      // 2. ส่งข้อมูลจริงไปยัง Backend FastAPI
-      const response = await fetch("http://localhost:8000/preferences/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(preferencePayload),
-      });
+            if (!prefResponse.ok) {
+              const errData = await prefResponse.json().catch(() => ({}));
+              throw new Error(errData.detail || `Failed to save preferences (${prefResponse.status})`);
+            }
 
-      if (!response.ok) {
-        throw new Error(`Server responded with status: ${response.status}`);
-      }
+            const savedPrefResult = await prefResponse.json();
+            console.log('✅ Step 2 — Preferences saved:', savedPrefResult);
 
-      const result = await response.json();
-      console.log("✅ Preferences successfully saved to backend:", result);
+            // 4. เก็บข้อมูลเสริมที่ V2 ยังไม่มีใน /trips/ (เช่น วันที่, destination, เวลาเริ่ม-จบวัน, pinned_spots) ไว้ใช้ต่อในหน้า Itinerary
+            localStorage.setItem(
+              'trip_preferences',
+              JSON.stringify({
+                ...apiPreferencePayload,
+                title: tripTitle,
+                destination: destinationName,
+                start_date: prefs.startDate,
+                end_date: prefs.endDate,
+                daily_start_time: prefs.dailyStartTime || '09:00',
+                daily_end_time: prefs.dailyEndTime || '21:00',
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Taipei',
+                pinned_spots: pinnedIds,
+              })
+            );
 
-// 3. สั่งเปลี่ยนเส้นทางไปยังหน้ารายละเอียดทริป
-router.push(`/itinerary?trip_id=${tripId}`);
-          } catch (error) {
-            console.error("❌ Error saving preferences:", error);
-            alert("Failed to save trip preferences. Please try again.");
+            // ล้างค่า draftTripId เมื่อบันทึกครบทั้ง 2 ขั้นตอนสำเร็จแล้ว
+            setDraftTripId(null);
+
+            // 5. ไปยังหน้ารายละเอียดทริปพร้อมส่ง trip_id จริง
+            router.push(`/itinerary?trip_id=${activeTripId}`);
+          } catch (error: unknown) {
+            console.error('❌ Error in trip creation / preference saving:', error);
+            const message = error instanceof Error ? error.message : 'Please try again.';
+            alert(`ไม่สามารถบันทึกข้อมูลทริปได้: ${message}`);
           }
         }}
-        
         onTogglePin={handleTogglePin}
         attractions={mockAttractions}
         currentPlan={mockPlan}
