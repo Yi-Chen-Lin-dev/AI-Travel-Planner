@@ -100,6 +100,13 @@ def apply(rows):
                            'Taipei City','臺北市','Taipei City',TRUE)
                    ON CONFLICT (region_id) DO NOTHING"""
             )
+            # A disposable local demo user, matching the frontend default test UUID.
+            # This is NOT an authentication mechanism and is never for production.
+            cur.execute(
+                """INSERT INTO public.users (user_id, display_name)
+                   VALUES ('50048c95-b993-4a00-b13e-8e82262d7ec8', 'Local MVP Tester')
+                   ON CONFLICT (user_id) DO NOTHING"""
+            )
             written = 0
             for poi in rows:
                 cur.execute(
