@@ -91,3 +91,92 @@ psql -d atp_mvp_1124 -c "INSERT INTO public.users(user_id,display_name) VALUES (
 ## Reviews and safety
 
 **Nobody (including the assistant) has approved or merged PR #36, #37, #39 or #40.** This branch is for inspection and testing, not an automatic substitute for the original PRs. Do not merge it without code review, data contract reconciliation, and real tests. In particular, `docs/DATA_CONTRACT.md` (shared MVP) and `backend/DATA_CONTRACT.md` (V2 draft) have different scopes; team sign-off is still required.
+
+
+---
+
+## 2026-11-24 follow-up: first complete local **preview** vertical slice (UNVERIFIED)
+
+New code now exists in this review branch:
+
+- \`ai/recommendation_baseline.py\`: explainable deterministic *rule-based* interest scoring (NOT William's final ML recommendation).
+- \`ai/poi_adapter.py\`: converts explicit opening periods and visit duration, preserves unknown values as unknown.
+- \`ai/travel_matrix.py\`: explicitly approximate straight-line-scaled travel minutes, NOT a routing API.
+- \`ai/mvp_pipeline.py\`: recommendations -> estimated matrix -> existing optimizer with reasons and data-provenance warnings.
+- \`backend/api/itineraries.py\`: a **local-only, opt-in** \`POST /itineraries/generate\` and \`GET /itineraries/{trip_id}\`; saves a first itinerary, rankings and unscheduled reasons to PostgreSQL. Regeneration of the same trip currently returns HTTP 409 (create another trip for a new test).
+- \`frontend/app/result/page.tsx\`: displays actual returned days, ordered stops, times, explanations, an OpenStreetMap view of the selected POI and a link to Google Maps directions. It does **not** yet plot all route legs on one map.
+- \`scripts/seed_mvp_local.py\`: dry-run by default; can seed qualifying records from William's 95 raw Taipei samples, **only** in a guarded disposable local database.
+- \`tests/test_recommendation_baseline.py\` and \`tests/test_mvp_pipeline.py\`: standalone verification of mapping, ranking changes and scheduling input.
+
+### Database setup for the explicit local preview
+
+**Never point these steps at William's remote database or any database containing important data.**
+
+First create a NEW empty LOCAL PostgreSQL test database and apply the schema:
+
+\`\`\`sh
+cd ATP-Integration-1124
+createdb atp_mvp_1124
+psql -v ON_ERROR_STOP=1 -d atp_mvp_1124 -f backend/database/planner.sql
+\`\`\`
+
+You must use a PostgreSQL role with suitable local privileges. \`createdb\` will fail if the database already exists; do not re-run the schema against existing tables.
+
+Set the environment variables for **your own local** PostgreSQL instance. \`DB_PASSWORD\` is required by Allen's current \`get_connection()\` implementation. Never commit or share credentials. You can enter it privately in your shell, rather than saving it in a file:
+
+\`\`\`sh
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_NAME=atp_mvp_1124
+export DB_USER=postgres
+read -rs "DB_PASSWORD?Local PostgreSQL password: "
+export DB_PASSWORD
+echo
+\`\`\`
+
+Change \`DB_USER\` if your local PostgreSQL user is not \`postgres\`. If your local DB uses password-less peer authentication, Allen's connection helper may need an environment-compatible update; do not blindly paste a made-up password.
+
+Run the seed audit **without writing**, then explicitly seed the local disposable database:
+
+\`\`\`sh
+python3 scripts/seed_mvp_local.py
+ALLOW_TEST_DB_SEED=1 python3 scripts/seed_mvp_local.py --apply
+\`\`\`
+
+The seed only includes real Taipei source records with positive stay duration and at least one parseable opening period. Most of William's sample has incomplete weekday hours; use **Tuesday, 2026-12-01** as the integration demonstration date. The underlying POI source may be outdated; a successful technical preview does not verify current opening hours.
+
+Create the disposable test user matching Fah's default \`NEXT_PUBLIC_TEST_USER_ID\`:
+
+\`\`\`sh
+psql -d atp_mvp_1124 -c "INSERT INTO public.users(user_id,display_name) VALUES ('50048c95-b993-4a00-b13e-8e82262d7ec8','Local MVP Tester') ON CONFLICT(user_id) DO NOTHING"
+\`\`\`
+
+Start the preview backend **in the same terminal containing your DB_* variables**:
+
+\`\`\`sh
+ENABLE_PREVIEW_ITINERARIES=1 ENABLE_ESTIMATED_TRAVEL=1 \
+  python3 -m uvicorn backend.api.main:app --reload --host 127.0.0.1 --port 8000
+\`\`\`
+
+In a second terminal, start Fah's real frontend and open \`http://localhost:3000\`:
+
+\`\`\`sh
+cd ATP-Integration-1124/frontend
+npm ci
+npm run dev
+\`\`\`
+
+Create a **Taipei** trip covering Tuesday 2026-12-01, choose **Culture** or **Nature**, save the preferences, then use the preview page's explicit estimate-consent button. It should call:
+
+\`\`\`text
+Frontend POST /trips/ -> POST /preferences/
+  -> GET /itineraries/{trip_id} (404 initially)
+  -> POST /itineraries/generate (explicit estimate consent)
+  -> PostgreSQL POIs -> rule-based Recommendation -> Optimizer
+  -> PostgreSQL itinerary/recommendations/unscheduled reasons
+  -> Frontend result + selected POI map -> GET saved result after refresh
+\`\`\`
+
+**Critical limitations:** This first local demo uses heuristic transport times, has no real routing/transit model, no current hours verification, no authentication, no itinerary edit/regeneration, no production map route overlay, and no fully finished William recommendation model. Do not deploy the preview endpoints publicly. The server explicitly rejects remote/non-test databases for these endpoints. It may still fail until locally executed and debugged; no E2E execution has yet been confirmed.
+
+**Verification checklist before claiming it works:** Python tests pass, frontend typecheck/build pass, DB schema/seed succeed, API POST/GET are correct, ranked POIs change with preferences, dates and stored itinerary survive a refresh, and the map uses POI coordinates. Log any failures with exact error text. No PR approval or merge is allowed without team review.
