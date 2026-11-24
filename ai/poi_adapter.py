@@ -12,7 +12,7 @@ from typing import Any
 from ai.recommendation_baseline import canonical_category
 
 DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
-INTERVAL = re.compile(r"^([01]\d|2[0-3]):[0-5]\d\s*[-–~～]\s*([01]\d|2[0-3]):[0-5]\d$")
+INTERVAL = re.compile(r"^((?:[01]\d|2[0-3]):[0-5]\d)\s*[-–~～]\s*((?:[01]\d|2[0-3]):[0-5]\d)$")
 CLOSED = {"休息", "公休", "closed", "不營業", "暫停營業"}
 
 
