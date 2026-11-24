@@ -56,7 +56,8 @@ class TestMvpPipeline(unittest.TestCase):
             generate_preview(self.trip, {"interests": ["culture"]}, [self.pois[-1]])
 
     def test_real_category_and_hours_adaptation(self):
-        self.assertEqual(len(normalize_day("10:00-12:00、14:00-17:00")), 2)
+        self.assertEqual(normalize_day("09:00-17:00"), [{"open": "09:00", "close": "17:00"}])
+        self.assertEqual(normalize_day("10:00-12:00、14:00-17:00"), [{"open": "10:00", "close": "12:00"}, {"open": "14:00", "close": "17:00"}])
         self.assertEqual(normalize_day("休息"), [])
         self.assertIsNone(normalize_day("maybe 24 hours"))
         normalized = normalize_weekly_hours({"tuesday": "休息", "friday": None})
