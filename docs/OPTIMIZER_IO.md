@@ -4,28 +4,28 @@
 
 **Implementation:** [ai/optimizer.py](../ai/optimizer.py), [runnable demo](../ai/demo_optimizer.py), [Golden Test](../tests/test_optimizer.py), and [Runbook](OPTIMIZER_MVP_RUNBOOK.md).
 
-**Canonical payload:** The *tested* v0.1 function accepts **nested** \`{"trip": {...}, "pois": [...], "travel_time_matrix": {...}}\` from [DATA_CONTRACT.md](DATA_CONTRACT.md). Sections 3–4 below are an earlier **flat-payload design draft**, not a valid call example for the current function. Use the current contract below until the team approves any future API changes.
+**Canonical payload:** The *tested* v0.1 function accepts **nested** `{"trip": {...}, "pois": [...], "travel_time_matrix": {...}}` from [DATA_CONTRACT.md](DATA_CONTRACT.md). Sections 3–4 below are an earlier **flat-payload design draft**, not a valid call example for the current function. Use the current contract below until the team approves any future API changes.
 
 ### Call and field rules
 
-\`\`\`python
+```python
 from optimizer import optimize_itinerary
 
 result = optimize_itinerary(payload)   # dict -> dict; no DB or network calls
-\`\`\`
+```
 
-- \`trip.start_date\` (**required**): local \`YYYY-MM-DD\`. \`trip.days\` (**required**): integer from 1 to 30. \`trip.timezone\` (**required**): valid IANA timezone, e.g., \`Asia/Taipei\`. It currently validates the name; date-time conversion across timezones is not implemented.
-- \`trip.daily_start_time\` and \`trip.daily_end_time\` are \`HH:MM\` strings, default \`09:00\` / \`21:00\`; the start must be earlier than the end. \`trip.trip_id\` is optional and echoed back when supplied.
-- The shared Data Contract also defines \`destination\`, \`transportation\` (\`walking\` / \`public_transport\` / \`driving\`), and \`pace\` (\`relaxed\` / \`normal\` / \`fast\`). These fields should be supplied by Backend. **v0.1 does not enforce their presence or use transportation/pace for scheduling**: Backend must generate a suitable matrix for the selected mode.
-- \`pois\` is an array. Every candidate requires unique \`poi_id\` (production: UUID string; v0.1 accepts numeric/test string IDs and converts to string), \`name\`, positive integer \`stay_duration_minutes\`, numeric \`recommendation_score\` between 0 and 1, and weekly \`opening_hours\`.
-- Weekday hours format: \`{"tuesday": [{"open": "09:00", "close": "17:00"}]}\`. \`[]\` means closed; \`null\` / missing means unknown and **not schedulable**. Multiple daytime windows are supported, but overnight windows and date-specific exceptions are not.
-- \`travel_time_matrix\` is a nested map of **directed** POI IDs to **non-negative integer minutes**. With a supplied \`trip.start_location\`, use \`travel_time_matrix["start"][poi_id]\` for the initial trip leg **on each day**; with no start location, first-leg travel defaults to zero. Unavailable later legs cannot be scheduled. The optimizer does not call a map provider.
-- \`trip.return_to_start=true\` is explicitly unsupported and is rejected in v0.1. A day starts independently; returning to a hotel is not calculated.
-- Invalid supported fields raise \`OptimizerInputError\` for Backend to translate into an HTTP validation response. This function is not itself an HTTP endpoint.
+- `trip.start_date` (**required**): local `YYYY-MM-DD`. `trip.days` (**required**): integer from 1 to 30. `trip.timezone` (**required**): valid IANA timezone, e.g., `Asia/Taipei`. It currently validates the name; date-time conversion across timezones is not implemented.
+- `trip.daily_start_time` and `trip.daily_end_time` are `HH:MM` strings, default `09:00` / `21:00`; the start must be earlier than the end. `trip.trip_id` is optional and echoed back when supplied.
+- The shared Data Contract also defines `destination`, `transportation` (`walking` / `public_transport` / `driving`), and `pace` (`relaxed` / `normal` / `fast`). These fields should be supplied by Backend. **v0.1 does not enforce their presence or use transportation/pace for scheduling**: Backend must generate a suitable matrix for the selected mode.
+- `pois` is an array. Every candidate requires unique `poi_id` (production: UUID string; v0.1 accepts numeric/test string IDs and converts to string), `name`, positive integer `stay_duration_minutes`, numeric `recommendation_score` between 0 and 1, and weekly `opening_hours`.
+- Weekday hours format: `{"tuesday": [{"open": "09:00", "close": "17:00"}]}`. `[]` means closed; `null` / missing means unknown and **not schedulable**. Multiple daytime windows are supported, but overnight windows and date-specific exceptions are not.
+- `travel_time_matrix` is a nested map of **directed** POI IDs to **non-negative integer minutes**. With a supplied `trip.start_location`, use `travel_time_matrix["start"][poi_id]` for the initial trip leg **on each day**; with no start location, first-leg travel defaults to zero. Unavailable later legs cannot be scheduled. The optimizer does not call a map provider.
+- `trip.return_to_start=true` is explicitly unsupported and is rejected in v0.1. A day starts independently; returning to a hotel is not calculated.
+- Invalid supported fields raise `OptimizerInputError` for Backend to translate into an HTTP validation response. This function is not itself an HTTP endpoint.
 
 ### Executable example (same shape as the Golden Test)
 
-\`\`\`json
+```json
 {
   "trip": {
     "trip_id": "39ff50b5-3c44-4cfa-ab44-54de6840e0f8",
@@ -50,19 +50,19 @@ result = optimize_itinerary(payload)   # dict -> dict; no DB or network calls
     "103": {"101": 30, "102": 35}
   }
 }
-\`\`\`
+```
 
-**Expected output:** \`status="partial"\`; day 1 on \`2026-12-01\` with POI 101 \`09:15–10:45\` followed by POI 102 \`11:05–12:05\`; POI 103 in \`unscheduled_pois\` with \`opening_hours_conflict\`. Summary: scheduled 2, unscheduled 1, total recommendation score 1.83, travel time 35 minutes. Output includes \`trip_id\` if supplied, \`days[].items\` (visit order, start/end, stay, travel legs, score), \`warnings\`, \`unscheduled_pois\`, and \`summary\`. Full exact JSON: run \`python3 ai/demo_optimizer.py\`.
+**Expected output:** `status="partial"`; day 1 on `2026-12-01` with POI 101 `09:15–10:45` followed by POI 102 `11:05–12:05`; POI 103 in `unscheduled_pois` with `opening_hours_conflict`. Summary: scheduled 2, unscheduled 1, total recommendation score 1.83, travel time 35 minutes. Output includes `trip_id` if supplied, `days[].items` (visit order, start/end, stay, travel legs, score), `warnings`, `unscheduled_pois`, and `summary`. Full exact JSON: run `python3 ai/demo_optimizer.py`.
 
 ### MVP / future scope
 
-The v0.1 algorithm is deterministic, **greedy**, and checks timetable feasibility. It does **not** guarantee the globally shortest route, enforce meal breaks, provide live routing, persist itineraries to PostgreSQL, integrate FastAPI/Frontend, or support overnight opening hours. Database → optimizer field conversion (\`estimated_visit_minutes\` → \`stay_duration_minutes\`, \`score\` → \`recommendation_score\`, etc.) belongs to Backend. These limitations must be resolved or explicitly accepted before end-to-end MVP signoff.
+The v0.1 algorithm is deterministic, **greedy**, and checks timetable feasibility. It does **not** guarantee the globally shortest route, enforce meal breaks, provide live routing, persist itineraries to PostgreSQL, integrate FastAPI/Frontend, or support overnight opening hours. Database → optimizer field conversion (`estimated_visit_minutes` → `stay_duration_minutes`, `score` → `recommendation_score`, etc.) belongs to Backend. These limitations must be resolved or explicitly accepted before end-to-end MVP signoff.
 
 ---
 
 ## Historical design draft (sections below)
 
-The sections below preserve the original W1 planned interface and requirements for reference. **When they conflict with v0.1 above, the executable contract and the shared [DATA_CONTRACT.md](DATA_CONTRACT.md) take precedence.** In particular, old flat-input examples, numeric production IDs, weekday \`["08:00","14:00"]\` opening-hour arrays, and date-null outputs are **not** the current executable behavior.
+The sections below preserve the original W1 planned interface and requirements for reference. **When they conflict with v0.1 above, the executable contract and the shared [DATA_CONTRACT.md](DATA_CONTRACT.md) take precedence.** In particular, old flat-input examples, numeric production IDs, weekday `["08:00","14:00"]` opening-hour arrays, and date-null outputs are **not** the current executable behavior.
 
 ---
 
