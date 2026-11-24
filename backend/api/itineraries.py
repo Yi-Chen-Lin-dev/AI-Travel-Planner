@@ -21,12 +21,12 @@ from .database import get_connection
 router = APIRouter(prefix="/itineraries", tags=["Local itinerary preview"])
 TZ = ZoneInfo("Asia/Taipei")
 ALIASES = {
-    "taipei": ("Taipei", "台北", "臺北"),
-    "tamsui": ("Tamsui", "淡水"),
-    "new taipei": ("New Taipei", "新北"),
-    "taichung": ("Taichung", "台中", "臺中"),
-    "tainan": ("Tainan", "台南", "臺南"),
-    "kaohsiung": ("Kaohsiung", "高雄"),
+    "taipei": ("台北市", "臺北市"),
+    "tamsui": ("淡水區",),
+    "new taipei": ("新北市",),
+    "taichung": ("台中市", "臺中市"),
+    "tainan": ("台南市", "臺南市"),
+    "kaohsiung": ("高雄市",),
 }
 
 
@@ -51,7 +51,8 @@ class GenerateInput(BaseModel):
 
 def _find_pois(cursor, destination: str) -> list[dict]:
     """Scope POIs by address or region label; do not mix unrelated cities."""
-    variants = ALIASES.get(destination.strip().lower(), (destination.strip(),))
+    key = destination.strip().lower()
+    variants = ALIASES.get(key, (destination.strip(),))
     comparisons = []
     params = []
     for name in variants:
@@ -59,6 +60,19 @@ def _find_pois(cursor, destination: str) -> list[dict]:
         for col in ("p.address", "r.name", "r.name_zh_hant", "r.name_en"):
             comparisons.append(f"COALESCE({col}, '') ILIKE %s")
             params.append(pattern)
+    # English display aliases may match other regions (e.g. "New Taipei").
+    # Require an exact region label instead of broad %Taipei% matching.
+    exact_names = {
+        "taipei": "Taipei City",
+        "new taipei": "New Taipei City",
+        "tamsui": "Tamsui District",
+        "taichung": "Taichung City",
+        "tainan": "Tainan City",
+        "kaohsiung": "Kaohsiung City",
+    }
+    if key in exact_names:
+        comparisons.extend(["r.name ILIKE %s", "r.name_en ILIKE %s"])
+        params.extend([exact_names[key], exact_names[key]])
     cursor.execute(
         """
         SELECT p.poi_id, p.name, p.latitude, p.longitude, p.category,
