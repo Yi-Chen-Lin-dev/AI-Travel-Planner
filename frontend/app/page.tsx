@@ -300,7 +300,7 @@ export default function Home() {
             setDraftTripId(null);
 
             // 5. ไปยังหน้ารายละเอียดทริปพร้อมส่ง trip_id จริง
-            router.push(`/itinerary?trip_id=${activeTripId}`);
+            router.push(`/result?trip_id=${activeTripId}`);
           } catch (error: unknown) {
             console.error('❌ Error in trip creation / preference saving:', error);
             const message = error instanceof Error ? error.message : 'Please try again.';
