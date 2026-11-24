@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import RouteMap from '../../components/RouteMap';
 
 type Stop = {
   poi_id: string; name: string; visit_order: number;
@@ -118,16 +119,6 @@ export default function GeneratedTripResult() {
 
   const day = result?.days[dayIndex];
   const stops = useMemo(() => day?.items || [], [day]);
-  const focus = stops[stopIndex] || stops[0];
-  const mapUrl = useMemo(() => {
-    if (!focus) return null;
-    const latitude = focus.latitude;
-    const longitude = focus.longitude;
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-    const bbox = [longitude - 0.009, latitude - 0.006, longitude + 0.009, latitude + 0.006].join(',');
-    return 'https://www.openstreetmap.org/export/embed.html?bbox=' + encodeURIComponent(bbox) +
-      '&layer=mapnik&marker=' + encodeURIComponent(String(latitude) + ',' + String(longitude));
-  }, [focus]);
 
   return (
     <main className="min-h-screen bg-[#F4F1EA] p-6 text-[#23272F]">
@@ -199,19 +190,9 @@ export default function GeneratedTripResult() {
                 ))}
               </section>
               <section className="rounded-xl bg-white p-4 shadow-sm">
-                <h3 className="mb-2 text-lg font-semibold">Selected stop — OpenStreetMap</h3>
-                <p className="mb-3 text-sm">Choose an itinerary stop to view its real latitude/longitude on the map.</p>
-                {mapUrl ? (
-                  <iframe
-                    title={'OpenStreetMap: ' + focus.name}
-                    src={mapUrl}
-                    className="h-[350px] w-full rounded-lg border"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="flex h-[350px] items-center justify-center bg-stone-100">No coordinates</div>
-                )}
+                <h3 className="mb-2 text-lg font-semibold">POI map — numbered stop order</h3>
+                <p className="mb-3 text-sm">The map shows actual POI coordinates. Dashed lines only connect visit order, not travel routes.</p>
+                <RouteMap stops={stops} selectedIndex={stopIndex} />
                 {routeLink(stops) && (
                   <a href={routeLink(stops) || '#'} target="_blank" rel="noreferrer"
                     className="mt-4 inline-block rounded-lg bg-[#245E51] px-4 py-2 text-sm font-medium text-white">
