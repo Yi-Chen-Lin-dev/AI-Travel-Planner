@@ -30,6 +30,18 @@ ALIASES = {
 }
 
 
+def _require_disposable_local_database() -> None:
+    """Hard block remote/production DB access from this unauthenticated preview API."""
+    host = os.getenv("DB_HOST", "localhost")
+    name = os.getenv("DB_NAME", "planner")
+    if host not in ("localhost", "127.0.0.1", "::1") or not name.startswith("atp_mvp_"):
+        raise HTTPException(
+            503,
+            "Preview endpoints are restricted to DB_HOST=localhost and a "
+            "disposable DB_NAME beginning with atp_mvp_.",
+        )
+
+
 class GenerateInput(BaseModel):
     trip_id: UUID
     allow_estimated_travel: bool = False
@@ -76,6 +88,7 @@ def _find_pois(cursor, destination: str) -> list[dict]:
 
 @router.post("/generate", status_code=201)
 def generate_itinerary(body: GenerateInput):
+    _require_disposable_local_database()
     if not body.allow_estimated_travel or os.getenv("ENABLE_ESTIMATED_TRAVEL") != "1":
         raise HTTPException(
             503,
@@ -188,6 +201,7 @@ def generate_itinerary(body: GenerateInput):
 
 @router.get("/{trip_id}")
 def get_itinerary(trip_id: UUID):
+    _require_disposable_local_database()
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
