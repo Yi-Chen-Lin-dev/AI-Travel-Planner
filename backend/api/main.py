@@ -31,6 +31,12 @@ app.include_router(pois_router)
 app.include_router(regions_router)
 app.include_router(countries_router)
 
+# Development-only optimizer smoke test (NOT a public production endpoint).
+import os
+if os.environ.get("ENABLE_DEV_OPTIMIZER_SMOKE") == "1":
+    from .optimizer_smoke import router as optimizer_smoke_router
+    app.include_router(optimizer_smoke_router)
+
 
 @app.get("/")
 def home():
