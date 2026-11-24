@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - integration/mvp-20261124-review
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
