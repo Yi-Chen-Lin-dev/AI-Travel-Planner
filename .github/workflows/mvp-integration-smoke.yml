@@ -20,6 +20,8 @@ jobs:
           python-version: "3.12"
       - name: Install isolated dependencies
         run: python3 -m pip install -r backend/requirements-integration.txt
+      - name: Audit William POI sample (read only)
+        run: python3 scripts/audit_william_poi_sample.py
       - name: Run offline optimizer and integration contract tests
         run: python3 -m unittest discover -s tests -p 'test_optimizer*.py' -v
 
