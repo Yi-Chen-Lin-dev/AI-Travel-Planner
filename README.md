@@ -1,5 +1,8 @@
 # AI Travel Planner
 
+> **Integration review workbench (2026-11-24):** This branch stages Fah's Next.js frontend, Allen's FastAPI V2 + DB schema, Yi-Chen's optimizer, and William's sample POI data. It is **NOT a completed November MVP**, and **no teammate PR has been approved or merged**. See [local runbook and known blockers](docs/INTEGRATION_20261124.md). Use `backend.api.main:app`; the legacy `backend/app/` is not the integrated backend.
+
+
 AI-powered personalized travel planning and itinerary optimization system.
 
 ## Status
