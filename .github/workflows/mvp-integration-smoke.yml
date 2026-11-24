@@ -89,4 +89,4 @@ jobs:
       - name: Seed William's qualifying sample POIs into ephemeral database
         run: ALLOW_TEST_DB_SEED=1 python3 scripts/seed_mvp_local.py --apply
       - name: Run actual API -> DB -> recommendation -> optimizer -> saved trip tests
-        run: python3 -m unittest tests/test_postgres_e2e.py -v
+        run: python3 -m unittest discover -s tests -p 'test_postgres_e2e.py' -v
