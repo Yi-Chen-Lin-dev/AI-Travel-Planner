@@ -20,10 +20,14 @@ jobs:
           python-version: "3.12"
       - name: Install isolated dependencies
         run: python3 -m pip install -r backend/requirements-integration.txt
+      - name: Python syntax check
+        run: python3 -m compileall -q ai backend/api scripts tests
+      - name: Validate local POI seed (dry run; no DB)
+        run: python3 scripts/seed_mvp_local.py
       - name: Audit William POI sample (read only)
         run: python3 scripts/audit_william_poi_sample.py
       - name: Run offline optimizer and integration contract tests
-        run: python3 -m unittest discover -s tests -p 'test_optimizer*.py' -v
+        run: python3 -m unittest discover -s tests -v
 
   frontend-typecheck:
     name: Frontend TypeScript check
