@@ -9,6 +9,8 @@ import unittest
 from pathlib import Path
 
 from fastapi import HTTPException
+from pydantic import ValidationError
+from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ai"))
 from demo_optimizer import sample
@@ -28,6 +30,30 @@ class TestOptimizerApiSmoke(unittest.TestCase):
         with self.assertRaises(HTTPException) as ctx:
             optimizer_smoke(payload)
         self.assertEqual(ctx.exception.status_code, 422)
+
+
+class TestTripCreateContract(unittest.TestCase):
+    def test_trip_dates_and_destination_accepted(self):
+        from backend.api.trips import TripCreate
+        trip = TripCreate(
+            user_id=uuid4(), title="Taipei Demo", destination="Taipei",
+            start_date="2026-12-01", end_date="2026-12-02",
+        )
+        self.assertEqual(trip.destination, "Taipei")
+        self.assertEqual(trip.start_date.isoformat(), "2026-12-01")
+
+    def test_trip_rejects_invalid_date_range(self):
+        from backend.api.trips import TripCreate
+        with self.assertRaises(ValidationError):
+            TripCreate(
+                user_id=uuid4(), title="Taipei Demo", destination="Taipei",
+                start_date="2026-12-02", end_date="2026-12-01",
+            )
+
+    def test_trip_title_follows_sql_length(self):
+        from backend.api.trips import TripCreate
+        with self.assertRaises(ValidationError):
+            TripCreate(user_id=uuid4(), title="X" * 151)
 
 
 if __name__ == "__main__":
