@@ -15,13 +15,14 @@ type Stop = {
 type Day = { day: number; date: string; items: Stop[] };
 type Itinerary = {
   itinerary_id: string; destination?: string; status: string;
+  transportation?: 'walking' | 'public_transport' | 'driving';
   days: Day[]; warnings?: string[];
   unscheduled_pois?: { poi_id: string; name: string; reason: string }[];
 };
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
-function routeLink(stops: Stop[]): string | null {
+function routeLink(stops: Stop[], transport: 'walking' | 'public_transport' | 'driving' = 'walking'): string | null {
   if (!stops.length) return null;
   const point = (s: Stop) => String(s.latitude) + ',' + String(s.longitude);
   const url = new URL('https://www.google.com/maps/dir/');
@@ -35,7 +36,7 @@ function routeLink(stops: Stop[]): string | null {
   } else {
     url.searchParams.set('destination', point(stops[0]));
   }
-  url.searchParams.set('travelmode', 'walking');
+  url.searchParams.set('travelmode', transport === 'public_transport' ? 'transit' : transport);
   return url.toString();
 }
 
@@ -193,8 +194,8 @@ export default function GeneratedTripResult() {
                 <h3 className="mb-2 text-lg font-semibold">POI map — numbered stop order</h3>
                 <p className="mb-3 text-sm">The map shows actual POI coordinates. Dashed lines only connect visit order, not travel routes.</p>
                 <RouteMap stops={stops} selectedIndex={stopIndex} />
-                {routeLink(stops) && (
-                  <a href={routeLink(stops) || '#'} target="_blank" rel="noreferrer"
+                {routeLink(stops, result.transportation) && (
+                  <a href={routeLink(stops, result.transportation) || '#'} target="_blank" rel="noreferrer"
                     className="mt-4 inline-block rounded-lg bg-[#245E51] px-4 py-2 text-sm font-medium text-white">
                     Open ordered stops in Google Maps
                   </a>
