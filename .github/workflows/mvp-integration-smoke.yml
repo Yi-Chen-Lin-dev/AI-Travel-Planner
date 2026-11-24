@@ -1,0 +1,41 @@
+name: MVP integration smoke (review-only)
+
+on:
+  push:
+    branches:
+      - integration/mvp-20261124-review
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-smoke:
+    name: Python optimizer + adapter tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install isolated dependencies
+        run: python3 -m pip install -r backend/requirements-integration.txt
+      - name: Run offline optimizer and integration contract tests
+        run: python3 -m unittest discover -s tests -p 'test_optimizer*.py' -v
+
+  frontend-typecheck:
+    name: Frontend TypeScript check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend
+        working-directory: frontend
+        run: npm ci
+      - name: Typecheck frontend
+        working-directory: frontend
+        run: npx tsc --noEmit
