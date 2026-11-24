@@ -8,7 +8,7 @@ import { Attraction, TripPlan } from '../types/trip';
 
 // TODO: แทนที่ด้วย user_id จริงที่สร้างจากตาราง public.users ใน PostgreSQL (จนกว่าจะมีระบบ LINE Login)
 
-const TEST_USER_ID = '50048c95-b993-4a00-b13e-8e82262d7ec8';
+const TEST_USER_ID = process.env.NEXT_PUBLIC_TEST_USER_ID || '50048c95-b993-4a00-b13e-8e82262d7ec8'; // LOCAL DEMO ONLY. Not authentication.
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 // ฟังก์ชันช่วยแปลงค่าจากฟอร์มให้ตรงตาม Allowed Values ใน API_CONTRACT.md V2
@@ -224,7 +224,7 @@ export default function Home() {
             }
 
             const destinationName = (prefs.destination || 'Taipei').trim();
-            const tripTitle = (prefs.title || `${destinationName} Trip`).slice(0, 200);
+            const tripTitle = (prefs.title || `${destinationName} Trip`).slice(0, 150);
 
             // 2. ขั้นที่ 1: สร้าง Draft Trip ผ่าน POST /trips/ (ถ้ายังไม่เคยสร้างในรอบนี้)
             let activeTripId = draftTripId;
@@ -236,6 +236,9 @@ export default function Home() {
                 body: JSON.stringify({
                   user_id: TEST_USER_ID,
                   title: tripTitle,
+                  destination: destinationName,
+                  start_date: prefs.startDate,
+                  end_date: prefs.endDate,
                 }),
               });
 
