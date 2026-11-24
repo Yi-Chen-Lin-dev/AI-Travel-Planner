@@ -86,7 +86,7 @@ psql -d atp_mvp_1124 -c "INSERT INTO public.users(user_id,display_name) VALUES (
 | William | Canonical POIs, opening hours/duration, deterministic ranked POIs + reasons | Raw 95 records and importer are not yet recommendation-ready |
 | Allen | Reviewed DB adapter, date write/read, `POST /itineraries/generate`, real travel matrix + persistence | This branch only exposes a synthetic /dev optimizer smoke route |
 | Fah | Replace `simulatedDays`, display actual itinerary and map, error/empty handling | Current UI uses mock POIs, static map coordinates and mock weather |
-| Yi-Chen | Verify real optimizer input from DB/recommendation, run E2E tests and lead review | Seven developer-reported optimizer tests are not proof of E2E integration |
+| Yi-Chen | Verify real optimizer input from DB/recommendation, run E2E tests and lead review | Developer-reported unit tests and review-branch tests are not proof of live E2E integration |
 
 ## Reviews and safety
 
@@ -104,7 +104,7 @@ New code now exists in this review branch:
 - \`ai/travel_matrix.py\`: explicitly approximate straight-line-scaled travel minutes, NOT a routing API.
 - \`ai/mvp_pipeline.py\`: recommendations -> estimated matrix -> existing optimizer with reasons and data-provenance warnings.
 - \`backend/api/itineraries.py\`: a **local-only, opt-in** \`POST /itineraries/generate\` and \`GET /itineraries/{trip_id}\`; saves a first itinerary, rankings and unscheduled reasons to PostgreSQL. Regeneration of the same trip currently returns HTTP 409 (create another trip for a new test).
-- \`frontend/app/result/page.tsx\`: displays actual returned days, ordered stops, times, explanations, an OpenStreetMap view of the selected POI and a link to Google Maps directions. It does **not** yet plot all route legs on one map.
+- \`frontend/app/result/page.tsx\`: displays actual returned days, ordered stops, times, explanations, an OpenStreetMap view of the selected POI and a link to Google Maps directions. All POIs are plotted on OpenStreetMap tiles with numbered order and dashed schematic connectors; these are **not** real route legs.
 - \`scripts/seed_mvp_local.py\`: dry-run by default; can seed qualifying records from William's 95 raw Taipei samples, **only** in a guarded disposable local database.
 - \`tests/test_recommendation_baseline.py\` and \`tests/test_mvp_pipeline.py\`: standalone verification of mapping, ranking changes and scheduling input.
 
@@ -122,7 +122,7 @@ psql -v ON_ERROR_STOP=1 -d atp_mvp_1124 -f backend/database/planner.sql
 
 You must use a PostgreSQL role with suitable local privileges. \`createdb\` will fail if the database already exists; do not re-run the schema against existing tables.
 
-Set the environment variables for **your own local** PostgreSQL instance. \`DB_PASSWORD\` is required by Allen's current \`get_connection()\` implementation. Never commit or share credentials. You can enter it privately in your shell, rather than saving it in a file:
+Set the environment variables for **your own local** PostgreSQL instance. \`DB_PASSWORD\` is optional when your local PostgreSQL setup uses passwordless authentication; otherwise set it privately in your terminal. Never commit or share credentials. You can enter it privately in your shell, rather than saving it in a file:
 
 \`\`\`sh
 export DB_HOST=localhost
@@ -134,7 +134,7 @@ export DB_PASSWORD
 echo
 \`\`\`
 
-Change \`DB_USER\` if your local PostgreSQL user is not \`postgres\`. If your local DB uses password-less peer authentication, Allen's connection helper may need an environment-compatible update; do not blindly paste a made-up password.
+Change \`DB_USER\` if your local PostgreSQL user is not \`postgres\`. If your local DB uses passwordless authentication, leave DB_PASSWORD unset. Do not paste or commit credentials.
 
 Run the seed audit **without writing**, then explicitly seed the local disposable database:
 
