@@ -50,6 +50,15 @@ def home():
     return {"message": "AI Travel Planner API is running"}
 
 
+@app.get("/health")
+def health():
+    """Application liveness check: no database access."""
+    return {
+        "status": "ok",
+        "preview_enabled": os.environ.get("ENABLE_PREVIEW_ITINERARIES") == "1",
+    }
+
+
 @app.get("/db-check")
 def check_database():
     with get_connection() as conn:
