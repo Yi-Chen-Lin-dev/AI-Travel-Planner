@@ -210,6 +210,7 @@ def generate_itinerary(body: GenerateInput):
                 (trip_id,),
             )
             result["itinerary_id"] = str(itinerary_id)
+            result["transportation"] = transport
             return result
 
 
@@ -219,16 +220,17 @@ def get_itinerary(trip_id: UUID):
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """SELECT it.itinerary_id,t.destination,t.start_date,t.end_date
+                """SELECT it.itinerary_id,t.destination,t.start_date,t.end_date,pref.transport_mode
                    FROM public.itineraries it
                    JOIN public.trips t ON t.trip_id=it.trip_id
+                   LEFT JOIN public.trip_preferences pref ON pref.trip_id=it.trip_id
                    WHERE it.trip_id=%s AND it.version_status='current'""",
                 (trip_id,),
             )
             header = cur.fetchone()
             if header is None:
                 raise HTTPException(404, "No generated itinerary for this trip")
-            itinerary_id, destination, first_date, last_date = header
+            itinerary_id, destination, first_date, last_date, transportation = header
             cur.execute(
                 """SELECT ii.day_number,ii.visit_order,ii.poi_id,p.name,
                           ii.arrival_time,ii.departure_time,
@@ -269,6 +271,7 @@ def get_itinerary(trip_id: UUID):
     return {
         "trip_id": str(trip_id), "itinerary_id": str(itinerary_id),
         "destination": destination, "status": "saved_preview",
+        "transportation": transportation,
         "preview_only": True,
         "travel_time_source": SOURCE,
         "recommendation_source": "rule_based_baseline_not_trained_ai",
