@@ -31,6 +31,13 @@ app.include_router(pois_router)
 app.include_router(regions_router)
 app.include_router(countries_router)
 
+# Opt-in local preview API. Not suitable for public deployment without authentication
+# and a real route provider; it writes to the configured PostgreSQL test database.
+import os
+if os.environ.get("ENABLE_PREVIEW_ITINERARIES") == "1":
+    from .itineraries import router as preview_itineraries_router
+    app.include_router(preview_itineraries_router)
+
 # Development-only optimizer smoke test (NOT a public production endpoint).
 import os
 if os.environ.get("ENABLE_DEV_OPTIMIZER_SMOKE") == "1":
