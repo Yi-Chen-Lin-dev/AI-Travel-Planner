@@ -48,3 +48,45 @@ jobs:
       - name: Typecheck frontend
         working-directory: frontend
         run: npx tsc --noEmit
+
+
+  postgres-e2e:
+    name: Real PostgreSQL end-to-end (disposable CI DB)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: local_ci_password_only
+          POSTGRES_DB: atp_mvp_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d atp_mvp_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: atp_mvp_ci
+      DB_USER: postgres
+      DB_PASSWORD: local_ci_password_only
+      PGPASSWORD: local_ci_password_only
+      RUN_POSTGRES_E2E: "1"
+      ENABLE_PREVIEW_ITINERARIES: "1"
+      ENABLE_ESTIMATED_TRAVEL: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install API dependencies
+        run: python3 -m pip install -r backend/requirements-integration.txt
+      - name: Create empty V2 schema in ephemeral Postgres service
+        run: psql -h localhost -U postgres -d atp_mvp_ci -v ON_ERROR_STOP=1 -f backend/database/planner.sql
+      - name: Seed William's qualifying sample POIs into ephemeral database
+        run: ALLOW_TEST_DB_SEED=1 python3 scripts/seed_mvp_local.py --apply
+      - name: Run actual API -> DB -> recommendation -> optimizer -> saved trip tests
+        run: python3 -m unittest tests/test_postgres_e2e.py -v
